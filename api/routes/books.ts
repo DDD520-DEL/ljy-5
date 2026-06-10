@@ -1,6 +1,6 @@
 import express from 'express'
 import QRCode from 'qrcode'
-import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations } from '../db'
+import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower } from '../db'
 import type { CreateBookRequest, CreateReviewRequest } from '../../shared/types'
 
 const router = express.Router()
@@ -140,9 +140,19 @@ router.post('/:id/borrow', (req, res) => {
     return
   }
   incrementBorrowCount(id)
-  const { operator } = req.body as { operator?: string }
-  addTraceLog(id, '借出', `读者借阅，书店${operator || '管理员'}登记`, operator || '管理员')
-  res.json({ success: true, borrowCount: book.borrowCount })
+  const { operator, borrower } = req.body as { operator?: string; borrower?: string }
+  let description = `读者借阅，书店${operator || '管理员'}登记`
+  if (borrower) {
+    description = `${borrower}借阅该书，书店${operator || '管理员'}登记`
+  }
+  addTraceLog(id, '借出', description, operator || '管理员')
+
+  let fulfilledReservation = null
+  if (borrower) {
+    fulfilledReservation = fulfillReservationByBorrower(id, borrower)
+  }
+
+  res.json({ success: true, borrowCount: book.borrowCount, fulfilledReservation })
 })
 
 router.post('/:id/return', (req, res) => {

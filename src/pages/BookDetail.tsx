@@ -52,6 +52,8 @@ export default function BookDetail() {
 
   const [borrowing, setBorrowing] = useState(false)
   const [borrowSuccess, setBorrowSuccess] = useState(false)
+  const [borrowerName, setBorrowerName] = useState('')
+  const [fulfilledReservationName, setFulfilledReservationName] = useState<string | null>(null)
 
   const [showQrcode, setShowQrcode] = useState(false)
 
@@ -131,14 +133,27 @@ export default function BookDetail() {
     if (!book) return
     try {
       setBorrowing(true)
-      await bookApi.borrow(book.id)
+      const result = await bookApi.borrow(book.id, { borrower: borrowerName.trim() || undefined })
       setBorrowSuccess(true)
       setIsBorrowed(true)
-      setTimeout(() => setBorrowSuccess(false), 3000)
-      const bookData = await bookApi.get(book.id)
+      if (result.fulfilledReservation) {
+        setFulfilledReservationName(result.fulfilledReservation.nickname)
+      }
+      setTimeout(() => {
+        setBorrowSuccess(false)
+        setFulfilledReservationName(null)
+      }, 5000)
+      setBorrowerName('')
+      const [bookData, traceData, statusData, reservationsData] = await Promise.all([
+        bookApi.get(book.id),
+        bookApi.trace(book.id),
+        bookApi.status(book.id),
+        reservationApi.listByBook(book.id),
+      ])
       setBook(bookData)
-      const traceData = await bookApi.trace(book.id)
       setTraceLogs(traceData)
+      setIsBorrowed(statusData.borrowed)
+      setReservations(reservationsData)
     } catch (err) {
       alert(err instanceof Error ? err.message : '登记失败')
     } finally {
@@ -381,33 +396,57 @@ export default function BookDetail() {
           )}
 
           {!isBorrowed && borrowSuccess ? (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-forest-500/10 border border-forest-500/20">
-              <div className="w-10 h-10 rounded-full bg-forest-500/10 flex items-center justify-center flex-shrink-0">
-                <CheckCircle className="w-5 h-5 text-forest-500" />
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-forest-500/10 border border-forest-500/20">
+                <div className="w-10 h-10 rounded-full bg-forest-500/10 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="w-5 h-5 text-forest-500" />
+                </div>
+                <div>
+                  <p className="font-medium text-forest-600">登记成功！</p>
+                  <p className="text-sm text-forest-500/80">借阅记录已更新</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-forest-600">登记成功！</p>
-                <p className="text-sm text-forest-500/80">借阅记录已更新</p>
-              </div>
+              {fulfilledReservationName && (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-emerald-700">预约已完成</p>
+                    <p className="text-sm text-emerald-600">{fulfilledReservationName} 的预约状态已更新为已完成</p>
+                  </div>
+                </div>
+              )}
             </div>
           ) : !isBorrowed ? (
-            <button
-              onClick={handleBorrow}
-              disabled={borrowing}
-              className={cn(
-                'btn-primary w-full inline-flex items-center justify-center gap-2 py-3 text-base',
-                borrowing && 'opacity-50 cursor-not-allowed hover:bg-coffee-700 hover:translate-y-0'
-              )}
-            >
-              {borrowing ? (
-                <>登记中...</>
-              ) : (
-                <>
-                  <BookOpen className="w-5 h-5" />
-                  登记借阅
-                </>
-              )}
-            </button>
+            <div className="space-y-3">
+              <div>
+                <label className="label">借阅人姓名</label>
+                <input
+                  type="text"
+                  value={borrowerName}
+                  onChange={(e) => setBorrowerName(e.target.value)}
+                  placeholder="请输入借阅人姓名（如被通知预约人，将自动完成预约）"
+                  disabled={borrowing}
+                  className={cn('input-field', borrowing && 'opacity-50 cursor-not-allowed')}
+                />
+              </div>
+              <button
+                onClick={handleBorrow}
+                disabled={borrowing}
+                className={cn(
+                  'btn-primary w-full inline-flex items-center justify-center gap-2 py-3 text-base',
+                  borrowing && 'opacity-50 cursor-not-allowed hover:bg-coffee-700 hover:translate-y-0'
+                )}
+              >
+                {borrowing ? (
+                  <>登记中...</>
+                ) : (
+                  <>
+                    <BookOpen className="w-5 h-5" />
+                    登记借阅
+                  </>
+                )}
+              </button>
+            </div>
           ) : null}
 
           {isBorrowed && returnSuccess ? (

@@ -462,6 +462,24 @@ export function notifyNextInQueue(bookId: number): Reservation | null {
   return next
 }
 
+export function fulfillReservationByBorrower(bookId: number, nickname: string): Reservation | null {
+  const reservation = db.reservations.find(
+    r => r.bookId === bookId && r.status === 'notified' && r.nickname === nickname
+  )
+  if (!reservation) {
+    return null
+  }
+  reservation.status = 'fulfilled'
+  const bookReservations = db.reservations.filter(
+    r => r.bookId === bookId && r.status !== 'cancelled' && r.status !== 'fulfilled' && r.position > reservation.position
+  )
+  for (const r of bookReservations) {
+    r.position--
+  }
+  persistDB()
+  return reservation
+}
+
 export function returnBook(bookId: number, operator?: string): { book: Book; traceLog: TraceLog; notifiedReservation: Reservation | null } | null {
   const book = db.books.find(b => b.id === bookId)
   if (!book) {

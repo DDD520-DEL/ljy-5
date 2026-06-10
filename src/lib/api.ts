@@ -53,10 +53,10 @@ export const bookApi = {
     }),
   qrcode: (id: number) =>
     request<{ qrcode: string; traceId: string; traceUrl: string }>(`/books/${id}/qrcode`),
-  borrow: (id: number, operator?: string) =>
-    request<{ success: boolean; borrowCount: number }>(`/books/${id}/borrow`, {
+  borrow: (id: number, data?: { operator?: string; borrower?: string }) =>
+    request<{ success: boolean; borrowCount: number; fulfilledReservation: Reservation | null }>(`/books/${id}/borrow`, {
       method: 'POST',
-      body: JSON.stringify({ operator }),
+      body: JSON.stringify(data || {}),
     }),
   returnBook: (id: number, operator?: string) =>
     request<{
