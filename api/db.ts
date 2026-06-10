@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, SourceType } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -176,17 +176,25 @@ const initialRegistrations: Registration[] = [
   { id: 3, meetupId: 2, nickname: '小王子的玫瑰', contact: '13900139000', createdAt: '2026-05-01T10:00:00.000Z' }
 ]
 
+const initialReservations: Reservation[] = [
+  { id: 1, bookId: 1, nickname: '读书人小刘', contact: '13700137000', status: 'waiting', position: 1, createdAt: '2026-01-12T10:00:00.000Z' },
+  { id: 2, bookId: 1, nickname: '文学爱好者', contact: '13600136000', status: 'waiting', position: 2, createdAt: '2026-01-13T15:30:00.000Z' },
+  { id: 3, bookId: 2, nickname: '童话少女', status: 'notified', position: 1, createdAt: '2026-01-08T09:00:00.000Z', notifiedAt: '2026-01-09T10:00:00.000Z' }
+]
+
 export interface Database {
   books: Book[]
   traceLogs: TraceLog[]
   reviews: Review[]
   meetups: Meetup[]
   registrations: Registration[]
+  reservations: Reservation[]
   nextBookId: number
   nextTraceLogId: number
   nextReviewId: number
   nextMeetupId: number
   nextRegistrationId: number
+  nextReservationId: number
 }
 
 const initialDB: Database = {
@@ -195,11 +203,13 @@ const initialDB: Database = {
   reviews: initialReviews,
   meetups: initialMeetups,
   registrations: initialRegistrations,
+  reservations: initialReservations,
   nextBookId: 6,
   nextTraceLogId: 9,
   nextReviewId: 9,
   nextMeetupId: 4,
-  nextRegistrationId: 4
+  nextRegistrationId: 4,
+  nextReservationId: 4
 }
 
 let db: Database = initialDB
@@ -362,6 +372,119 @@ export function incrementBorrowCount(bookId: number): void {
     book.borrowCount++
     persistDB()
   }
+}
+
+export function isBookBorrowed(bookId: number): boolean {
+  const logs = db.traceLogs
+    .filter(l => l.bookId === bookId)
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+  return logs.length > 0 && logs[0].action === '借出'
+}
+
+export function addReservation(bookId: number, data: Omit<Reservation, 'id' | 'bookId' | 'status' | 'position' | 'createdAt'>): Reservation | null {
+  if (!isBookBorrowed(bookId)) {
+    return null
+  }
+  const bookReservations = db.reservations.filter(r => r.bookId === bookId && r.status !== 'cancelled' && r.status !== 'fulfilled')
+  const maxPosition = bookReservations.length > 0 ? Math.max(...bookReservations.map(r => r.position)) : 0
+  const reservation: Reservation = {
+    ...data,
+    id: db.nextReservationId++,
+    bookId,
+    status: 'waiting',
+    position: maxPosition + 1,
+    createdAt: new Date().toISOString()
+  }
+  db.reservations.push(reservation)
+  persistDB()
+  return reservation
+}
+
+export function getBookReservations(bookId: number): Reservation[] {
+  return db.reservations
+    .filter(r => r.bookId === bookId && r.status !== 'cancelled' && r.status !== 'fulfilled')
+    .sort((a, b) => a.position - b.position)
+}
+
+export function cancelReservation(reservationId: number): Reservation | null {
+  const reservation = db.reservations.find(r => r.id === reservationId)
+  if (!reservation || reservation.status === 'cancelled' || reservation.status === 'fulfilled') {
+    return null
+  }
+  reservation.status = 'cancelled'
+  const bookReservations = db.reservations.filter(
+    r => r.bookId === reservation.bookId && r.status !== 'cancelled' && r.status !== 'fulfilled' && r.position > reservation.position
+  )
+  for (const r of bookReservations) {
+    r.position--
+  }
+  persistDB()
+  return reservation
+}
+
+export function reorderReservation(reservationId: number, direction: 'up' | 'down'): Reservation | null {
+  const reservation = db.reservations.find(r => r.id === reservationId)
+  if (!reservation || reservation.status === 'cancelled' || reservation.status === 'fulfilled') {
+    return null
+  }
+  const bookReservations = db.reservations
+    .filter(r => r.bookId === reservation.bookId && r.status !== 'cancelled' && r.status !== 'fulfilled')
+    .sort((a, b) => a.position - b.position)
+  const currentIndex = bookReservations.findIndex(r => r.id === reservationId)
+  if (direction === 'up' && currentIndex > 0) {
+    const swapWith = bookReservations[currentIndex - 1]
+    const tempPos = reservation.position
+    reservation.position = swapWith.position
+    swapWith.position = tempPos
+  } else if (direction === 'down' && currentIndex < bookReservations.length - 1) {
+    const swapWith = bookReservations[currentIndex + 1]
+    const tempPos = reservation.position
+    reservation.position = swapWith.position
+    swapWith.position = tempPos
+  } else {
+    return null
+  }
+  persistDB()
+  return reservation
+}
+
+export function notifyNextInQueue(bookId: number): Reservation | null {
+  const waiting = db.reservations
+    .filter(r => r.bookId === bookId && r.status === 'waiting')
+    .sort((a, b) => a.position - b.position)
+  if (waiting.length === 0) {
+    return null
+  }
+  const next = waiting[0]
+  next.status = 'notified'
+  next.notifiedAt = new Date().toISOString()
+  persistDB()
+  return next
+}
+
+export function returnBook(bookId: number, operator?: string): { book: Book; traceLog: TraceLog; notifiedReservation: Reservation | null } | null {
+  const book = db.books.find(b => b.id === bookId)
+  if (!book) {
+    return null
+  }
+  if (!isBookBorrowed(bookId)) {
+    return null
+  }
+  const traceLog = addTraceLog(bookId, '归还', `读者归还图书，书店${operator || '管理员'}登记`, operator || '管理员')
+  const notifiedReservation = notifyNextInQueue(bookId)
+  persistDB()
+  return { book, traceLog, notifiedReservation }
+}
+
+export function getAllReservationsWithBookInfo(): { reservation: Reservation; book: Book }[] {
+  return db.reservations
+    .filter(r => r.status !== 'cancelled' && r.status !== 'fulfilled')
+    .map(r => {
+      const book = db.books.find(b => b.id === r.bookId)!
+      return { reservation: r, book }
+    })
+    .filter(item => item.book)
+    .sort((a, b) => a.reservation.position - b.reservation.position)
 }
 
 export function resetToInitialData(): void {

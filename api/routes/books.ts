@@ -1,6 +1,6 @@
 import express from 'express'
 import QRCode from 'qrcode'
-import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount } from '../db'
+import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations } from '../db'
 import type { CreateBookRequest, CreateReviewRequest } from '../../shared/types'
 
 const router = express.Router()
@@ -143,6 +143,34 @@ router.post('/:id/borrow', (req, res) => {
   const { operator } = req.body as { operator?: string }
   addTraceLog(id, '借出', `读者借阅，书店${operator || '管理员'}登记`, operator || '管理员')
   res.json({ success: true, borrowCount: book.borrowCount })
+})
+
+router.post('/:id/return', (req, res) => {
+  const id = parseInt(req.params.id)
+  const { operator } = req.body as { operator?: string }
+  const result = returnBook(id, operator)
+  if (!result) {
+    res.status(400).json({ error: '归还失败，图书不存在或未被借出' })
+    return
+  }
+  res.json({
+    success: true,
+    traceLog: result.traceLog,
+    notifiedReservation: result.notifiedReservation,
+  })
+})
+
+router.get('/:id/status', (req, res) => {
+  const id = parseInt(req.params.id)
+  const db = getDB()
+  const book = db.books.find(b => b.id === id)
+  if (!book) {
+    res.status(404).json({ error: '图书不存在' })
+    return
+  }
+  const borrowed = isBookBorrowed(id)
+  const reservations = getBookReservations(id)
+  res.json({ borrowed, reservationCount: reservations.length })
 })
 
 export default router

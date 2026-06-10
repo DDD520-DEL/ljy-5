@@ -4,10 +4,12 @@ import type {
   Review,
   Meetup,
   Registration,
+  Reservation,
   CreateBookRequest,
   CreateReviewRequest,
   CreateMeetupRequest,
   RegisterMeetupRequest,
+  CreateReservationRequest,
   UpdateMeetupSummaryRequest,
 } from '../../shared/types'
 
@@ -56,6 +58,17 @@ export const bookApi = {
       method: 'POST',
       body: JSON.stringify({ operator }),
     }),
+  returnBook: (id: number, operator?: string) =>
+    request<{
+      success: boolean
+      traceLog: TraceLog
+      notifiedReservation: Reservation | null
+    }>(`/books/${id}/return`, {
+      method: 'POST',
+      body: JSON.stringify({ operator }),
+    }),
+  status: (id: number) =>
+    request<{ borrowed: boolean; reservationCount: number }>(`/books/${id}/status`),
 }
 
 export const traceApi = {
@@ -80,4 +93,27 @@ export const meetupApi = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+}
+
+export const reservationApi = {
+  listByBook: (bookId: number) =>
+    request<Reservation[]>(`/reservations?bookId=${bookId}`),
+  listAll: () =>
+    request<{ reservation: Reservation; book: Book }[]>('/reservations'),
+  create: (bookId: number, data: CreateReservationRequest) =>
+    request<Reservation>('/reservations', {
+      method: 'POST',
+      body: JSON.stringify({ ...data, bookId }),
+    }),
+  cancel: (id: number) =>
+    request<Reservation>(`/reservations/${id}/cancel`, {
+      method: 'PUT',
+    }),
+  reorder: (id: number, direction: 'up' | 'down') =>
+    request<Reservation>(`/reservations/${id}/reorder`, {
+      method: 'PUT',
+      body: JSON.stringify({ direction }),
+    }),
+  stats: () =>
+    request<{ count: number }>('/reservations/stats/count'),
 }

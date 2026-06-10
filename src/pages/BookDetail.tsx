@@ -16,8 +16,13 @@ import {
   BarChart3,
   MessageSquare,
   X,
+  BookmarkPlus,
+  RotateCcw,
+  Users,
+  Bell,
+  AlertCircle,
 } from 'lucide-react'
-import { bookApi } from '@/lib/api'
+import { bookApi, reservationApi } from '@/lib/api'
 import {
   formatDateTime,
   sourceTypeLabel,
@@ -25,7 +30,7 @@ import {
   renderStars,
   cn,
 } from '@/lib/utils'
-import type { Book as BookType, TraceLog, Review } from '../../shared/types'
+import type { Book as BookType, TraceLog, Review, Reservation } from '../../shared/types'
 
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>()
@@ -50,6 +55,16 @@ export default function BookDetail() {
 
   const [showQrcode, setShowQrcode] = useState(false)
 
+  const [isBorrowed, setIsBorrowed] = useState(false)
+  const [reservations, setReservations] = useState<Reservation[]>([])
+  const [resNickname, setResNickname] = useState('')
+  const [resContact, setResContact] = useState('')
+  const [submittingReservation, setSubmittingReservation] = useState(false)
+  const [reservationSuccess, setReservationSuccess] = useState(false)
+  const [returning, setReturning] = useState(false)
+  const [returnSuccess, setReturnSuccess] = useState(false)
+  const [notifiedName, setNotifiedName] = useState<string | null>(null)
+
   useEffect(() => {
     if (!id) return
     loadData()
@@ -61,17 +76,21 @@ export default function BookDetail() {
       setError(null)
       const bookId = Number(id)
 
-      const [bookData, traceData, reviewsData, qrcodeDataResult] = await Promise.all([
+      const [bookData, traceData, reviewsData, qrcodeDataResult, statusData, reservationsData] = await Promise.all([
         bookApi.get(bookId),
         bookApi.trace(bookId),
         bookApi.reviews(bookId),
         bookApi.qrcode(bookId),
+        bookApi.status(bookId),
+        reservationApi.listByBook(bookId),
       ])
 
       setBook(bookData)
       setTraceLogs(traceData)
       setReviews(reviewsData)
       setQrcodeData(qrcodeDataResult)
+      setIsBorrowed(statusData.borrowed)
+      setReservations(reservationsData)
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
     } finally {
@@ -114,6 +133,7 @@ export default function BookDetail() {
       setBorrowing(true)
       await bookApi.borrow(book.id)
       setBorrowSuccess(true)
+      setIsBorrowed(true)
       setTimeout(() => setBorrowSuccess(false), 3000)
       const bookData = await bookApi.get(book.id)
       setBook(bookData)
@@ -123,6 +143,59 @@ export default function BookDetail() {
       alert(err instanceof Error ? err.message : '登记失败')
     } finally {
       setBorrowing(false)
+    }
+  }
+
+  async function handleReturn() {
+    if (!book) return
+    try {
+      setReturning(true)
+      const result = await bookApi.returnBook(book.id)
+      setReturnSuccess(true)
+      setIsBorrowed(false)
+      if (result.notifiedReservation) {
+        setNotifiedName(result.notifiedReservation.nickname)
+      }
+      setTimeout(() => {
+        setReturnSuccess(false)
+        setNotifiedName(null)
+      }, 5000)
+      const [bookData, traceData, statusData, reservationsData] = await Promise.all([
+        bookApi.get(book.id),
+        bookApi.trace(book.id),
+        bookApi.status(book.id),
+        reservationApi.listByBook(book.id),
+      ])
+      setBook(bookData)
+      setTraceLogs(traceData)
+      setIsBorrowed(statusData.borrowed)
+      setReservations(reservationsData)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '归还失败')
+    } finally {
+      setReturning(false)
+    }
+  }
+
+  async function handleReservation(e: React.FormEvent) {
+    e.preventDefault()
+    if (!book || !resNickname.trim()) return
+    try {
+      setSubmittingReservation(true)
+      await reservationApi.create(book.id, {
+        nickname: resNickname.trim(),
+        contact: resContact.trim() || undefined,
+      })
+      setReservationSuccess(true)
+      setResNickname('')
+      setResContact('')
+      setTimeout(() => setReservationSuccess(false), 3000)
+      const reservationsData = await reservationApi.listByBook(book.id)
+      setReservations(reservationsData)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '预约失败')
+    } finally {
+      setSubmittingReservation(false)
     }
   }
 
@@ -300,7 +373,14 @@ export default function BookDetail() {
             )}
           </div>
 
-          {borrowSuccess ? (
+          {isBorrowed && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+              <span className="text-sm font-medium text-red-600">此书已被借出</span>
+            </div>
+          )}
+
+          {!isBorrowed && borrowSuccess ? (
             <div className="flex items-center gap-3 p-4 rounded-xl bg-forest-500/10 border border-forest-500/20">
               <div className="w-10 h-10 rounded-full bg-forest-500/10 flex items-center justify-center flex-shrink-0">
                 <CheckCircle className="w-5 h-5 text-forest-500" />
@@ -310,7 +390,7 @@ export default function BookDetail() {
                 <p className="text-sm text-forest-500/80">借阅记录已更新</p>
               </div>
             </div>
-          ) : (
+          ) : !isBorrowed ? (
             <button
               onClick={handleBorrow}
               disabled={borrowing}
@@ -328,6 +408,157 @@ export default function BookDetail() {
                 </>
               )}
             </button>
+          ) : null}
+
+          {isBorrowed && returnSuccess ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-forest-500/10 border border-forest-500/20">
+                <div className="w-10 h-10 rounded-full bg-forest-500/10 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="w-5 h-5 text-forest-500" />
+                </div>
+                <div>
+                  <p className="font-medium text-forest-600">归还成功！</p>
+                  <p className="text-sm text-forest-500/80">图书已重新可借</p>
+                </div>
+              </div>
+              {notifiedName && (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-sky-50 border border-sky-200">
+                  <Bell className="w-5 h-5 text-sky-500 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-sky-700">已通知预约人</p>
+                    <p className="text-sm text-sky-600">{notifiedName} 已收到借阅通知</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : isBorrowed ? (
+            <button
+              onClick={handleReturn}
+              disabled={returning}
+              className={cn(
+                'btn-secondary w-full inline-flex items-center justify-center gap-2 py-3 text-base border-forest-500/30 text-forest-600 hover:bg-forest-500/5',
+                returning && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              {returning ? (
+                <>归还中...</>
+              ) : (
+                <>
+                  <RotateCcw className="w-5 h-5" />
+                  登记归还
+                </>
+              )}
+            </button>
+          ) : null}
+
+          {isBorrowed && !reservationSuccess && (
+            <div className="card p-6 border-coffee-200">
+              <h3 className="section-title flex items-center gap-2 mb-4 text-base">
+                <BookmarkPlus className="w-4 h-4" />
+                预约排队
+              </h3>
+              <p className="text-sm text-coffee-500 mb-4">
+                此书当前已被借出，您可以提交预约申请排队等待。
+              </p>
+              <form onSubmit={handleReservation} className="space-y-3">
+                <div>
+                  <label className="label">昵称 <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={resNickname}
+                    onChange={(e) => setResNickname(e.target.value)}
+                    placeholder="请输入您的昵称"
+                    disabled={submittingReservation}
+                    className={cn('input-field', submittingReservation && 'opacity-50 cursor-not-allowed')}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label">联系方式</label>
+                  <input
+                    type="text"
+                    value={resContact}
+                    onChange={(e) => setResContact(e.target.value)}
+                    placeholder="手机号/微信号（选填）"
+                    disabled={submittingReservation}
+                    className={cn('input-field', submittingReservation && 'opacity-50 cursor-not-allowed')}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={submittingReservation || !resNickname.trim()}
+                  className={cn(
+                    'w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium transition-all duration-200 bg-amber-500 text-white hover:bg-amber-600 hover:-translate-y-0.5 hover:shadow-lg',
+                    (submittingReservation || !resNickname.trim()) && 'opacity-50 cursor-not-allowed hover:bg-amber-500 hover:translate-y-0 hover:shadow-none'
+                  )}
+                >
+                  {submittingReservation ? (
+                    <>提交中...</>
+                  ) : (
+                    <>
+                      <BookmarkPlus className="w-4 h-4" />
+                      提交预约
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {isBorrowed && reservationSuccess && (
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <BookmarkPlus className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="font-medium text-amber-700">预约成功！</p>
+                <p className="text-sm text-amber-600/80">书归还后将第一时间通知您</p>
+              </div>
+            </div>
+          )}
+
+          {isBorrowed && reservations.length > 0 && (
+            <div className="card p-6 border-coffee-200">
+              <h3 className="section-title flex items-center gap-2 mb-4 text-base">
+                <Users className="w-4 h-4" />
+                预约队列
+                <span className="badge bg-amber-100 text-amber-600 ml-2">
+                  {reservations.length} 人排队
+                </span>
+              </h3>
+              <div className="space-y-2">
+                {reservations.map((res) => (
+                  <div
+                    key={res.id}
+                    className={cn(
+                      'flex items-center gap-3 p-3 rounded-lg border',
+                      res.status === 'notified'
+                        ? 'bg-sky-50 border-sky-200'
+                        : 'bg-coffee-50/50 border-coffee-100'
+                    )}
+                  >
+                    <div className={cn(
+                      'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold',
+                      res.status === 'notified'
+                        ? 'bg-sky-500 text-white'
+                        : 'bg-coffee-200 text-coffee-700'
+                    )}>
+                      {res.position}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-coffee-800 truncate">{res.nickname}</p>
+                      <p className="text-xs text-coffee-400">{formatDateTime(res.createdAt)}</p>
+                    </div>
+                    {res.status === 'notified' && (
+                      <span className="badge bg-sky-100 text-sky-600 border border-sky-200">
+                        <Bell className="w-3 h-3 mr-1" />
+                        已通知
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 

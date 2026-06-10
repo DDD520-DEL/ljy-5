@@ -94,6 +94,28 @@ export interface RegisterMeetupRequest {
   contact?: string
 }
 
+export type ReservationStatus = 'waiting' | 'notified' | 'cancelled' | 'fulfilled'
+
+export interface Reservation {
+  id: number
+  bookId: number
+  nickname: string
+  contact?: string
+  status: ReservationStatus
+  position: number
+  createdAt: string
+  notifiedAt?: string
+}
+
+export interface CreateReservationRequest {
+  nickname: string
+  contact?: string
+}
+
+export interface ReorderReservationRequest {
+  direction: 'up' | 'down'
+}
+
 export interface UpdateMeetupSummaryRequest {
   groupPhotos?: string[]
   discussionNotes?: string

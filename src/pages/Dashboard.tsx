@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles } from 'lucide-react'
-import { bookApi, meetupApi } from '@/lib/api'
+import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus } from 'lucide-react'
+import { bookApi, meetupApi, reservationApi } from '@/lib/api'
 import { formatDate, sourceTypeLabel, sourceTypeColor, meetupStatusLabel, meetupStatusColor, cn } from '@/lib/utils'
 import type { Book as BookType, Meetup } from '../../shared/types'
 
@@ -10,6 +10,7 @@ export default function Dashboard() {
   const [borrowRanking, setBorrowRanking] = useState<BookType[]>([])
   const [discussRanking, setDiscussRanking] = useState<BookType[]>([])
   const [meetups, setMeetups] = useState<Meetup[]>([])
+  const [reservationCount, setReservationCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [rankType, setRankType] = useState<'borrow' | 'discuss'>('borrow')
 
@@ -19,16 +20,18 @@ export default function Dashboard() {
 
   async function loadData() {
     try {
-      const [allBooks, borrowRank, discussRank, allMeetups] = await Promise.all([
+      const [allBooks, borrowRank, discussRank, allMeetups, resStats] = await Promise.all([
         bookApi.list(),
         bookApi.ranking('borrow'),
         bookApi.ranking('discuss'),
         meetupApi.list(),
+        reservationApi.stats(),
       ])
       setBooks(allBooks)
       setBorrowRanking(borrowRank)
       setDiscussRanking(discussRank)
       setMeetups(allMeetups.slice(0, 5))
+      setReservationCount(resStats.count)
     } catch (err) {
       console.error(err)
     } finally {
@@ -49,6 +52,13 @@ export default function Dashboard() {
       value: books.reduce((s, b) => s + b.borrowCount, 0),
       icon: Eye,
       gradient: 'from-brass-400 to-brass-600',
+      bg: 'bg-amber-50',
+    },
+    {
+      label: '当前预约数',
+      value: reservationCount,
+      icon: BookmarkPlus,
+      gradient: 'from-amber-400 to-amber-600',
       bg: 'bg-amber-50',
     },
     {
@@ -92,7 +102,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {stats.map((stat) => (
           <div
             key={stat.label}

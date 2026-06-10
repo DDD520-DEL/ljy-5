@@ -9,6 +9,7 @@ import TraceView from "@/pages/TraceView";
 import MeetupList from "@/pages/MeetupList";
 import MeetupCreate from "@/pages/MeetupCreate";
 import MeetupDetail from "@/pages/MeetupDetail";
+import ReservationManage from "@/pages/ReservationManage";
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/meetups" element={<MeetupList />} />
           <Route path="/meetups/new" element={<MeetupCreate />} />
           <Route path="/meetups/:id" element={<MeetupDetail />} />
+          <Route path="/reservations" element={<ReservationManage />} />
         </Route>
       </Routes>
     </Router>
