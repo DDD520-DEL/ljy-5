@@ -651,13 +651,14 @@ export function getCheckInsByMeetup(meetupId: number): CheckIn[] {
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 }
 
-export function getMeetupCheckInStats(meetupId: number): { totalRegistered: number; totalCheckedIn: number; checkInRate: number } {
+export function getMeetupCheckInStats(meetupId: number): { totalRegistered: number; totalCheckedIn: number; checkInRate: number; checkIns: CheckIn[] } {
   const registrations = db.registrations.filter(r => r.meetupId === meetupId)
   const checkedIn = registrations.filter(r => r.checkedIn)
   const totalRegistered = registrations.length
   const totalCheckedIn = checkedIn.length
   const checkInRate = totalRegistered > 0 ? Math.round((totalCheckedIn / totalRegistered) * 100) : 0
-  return { totalRegistered, totalCheckedIn, checkInRate }
+  const checkIns = getCheckInsByMeetup(meetupId)
+  return { totalRegistered, totalCheckedIn, checkInRate, checkIns }
 }
 
 export function updateMeetupSummary(meetupId: number, data: { groupPhotos?: string[]; discussionNotes?: string }): Meetup | null {

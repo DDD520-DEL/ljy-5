@@ -32,10 +32,9 @@ router.get('/:id', (req, res) => {
     return { ...r, level: account?.level || null }
   })
   
-  const checkIns = getCheckInsByMeetup(id)
   const stats = getMeetupCheckInStats(id)
   
-  res.json({ ...meetup, registrations, checkIns, checkInStats: stats })
+  res.json({ ...meetup, registrations, checkIns: stats.checkIns, checkInStats: stats })
 })
 
 router.get('/:id/qrcode', async (req, res) => {
@@ -98,9 +97,8 @@ router.get('/:id/checkins', (req, res) => {
     return
   }
   
-  const checkIns = getCheckInsByMeetup(id)
   const stats = getMeetupCheckInStats(id)
-  res.json({ checkIns, stats })
+  res.json({ checkIns: stats.checkIns, stats })
 })
 
 router.post('/', (req, res) => {
