@@ -26,6 +26,10 @@ import type {
   CheckIn,
   CheckInRequest,
   MeetupCheckInStats,
+  BorrowRecordWithBook,
+  BookBorrowStatus,
+  BorrowRecord,
+  Notification,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -68,8 +72,14 @@ export const bookApi = {
     }),
   qrcode: (id: number) =>
     request<{ qrcode: string; traceId: string; traceUrl: string }>(`/books/${id}/qrcode`),
-  borrow: (id: number, data?: { operator?: string; borrower?: string }) =>
-    request<{ success: boolean; borrowCount: number; fulfilledReservation: Reservation | null; pointsResult?: { account: PointsAccount; log: PointsLog; levelUp: boolean } }>(`/books/${id}/borrow`, {
+  borrow: (id: number, data?: { operator?: string; borrower?: string; contact?: string; borrowDays?: number }) =>
+    request<{ 
+      success: boolean; 
+      borrowCount: number; 
+      fulfilledReservation: Reservation | null; 
+      pointsResult?: { account: PointsAccount; log: PointsLog; levelUp: boolean };
+      borrowRecord: BorrowRecord | null;
+    }>(`/books/${id}/borrow`, {
       method: 'POST',
       body: JSON.stringify(data || {}),
     }),
@@ -78,16 +88,37 @@ export const bookApi = {
       success: boolean
       traceLog: TraceLog
       notifiedReservation: Reservation | null
+      borrowRecord: BorrowRecord | null
     }>(`/books/${id}/return`, {
       method: 'POST',
       body: JSON.stringify({ operator }),
     }),
+  reminder: (id: number, operator?: string) =>
+    request<{
+      success: boolean
+      record: BorrowRecord
+      notification: Notification
+      traceLog: TraceLog
+    }>(`/books/${id}/reminder`, {
+      method: 'POST',
+      body: JSON.stringify({ operator }),
+    }),
   status: (id: number) =>
-    request<{ borrowed: boolean; reservationCount: number }>(`/books/${id}/status`),
+    request<{ borrowed: boolean; reservationCount: number; borrowStatus: BookBorrowStatus }>(`/books/${id}/status`),
   readerRanking: (type: 'points' | 'borrow' = 'points', limit: number = 10) =>
     request<ReaderRanking[]>(`/books/readers/ranking?type=${type}&limit=${limit}`),
   readerProfile: (nickname: string) =>
     request<ReaderProfile>(`/books/readers/${encodeURIComponent(nickname)}`),
+  getNotifications: (nickname: string) =>
+    request<Notification[]>(`/books/readers/${encodeURIComponent(nickname)}/notifications`),
+  markNotificationRead: (nickname: string, notificationId: number) =>
+    request<{ success: boolean; notification: Notification }>(`/books/readers/${encodeURIComponent(nickname)}/notifications/${notificationId}/read`, {
+      method: 'POST',
+    }),
+  getActiveBorrows: () =>
+    request<BorrowRecordWithBook[]>('/books/borrow/active'),
+  getOverdueBorrows: () =>
+    request<BorrowRecordWithBook[]>('/books/borrow/overdue'),
 }
 
 export const traceApi = {

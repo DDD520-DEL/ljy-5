@@ -44,10 +44,54 @@ export interface Book {
 export interface TraceLog {
   id: number
   bookId: number
-  action: '入库' | '借出' | '归还' | '捐赠' | '转让'
+  action: '入库' | '借出' | '归还' | '捐赠' | '转让' | '催还'
   description: string
   timestamp: string
   operator?: string
+}
+
+export interface BorrowRecord {
+  id: number
+  bookId: number
+  borrower: string
+  contact?: string
+  borrowDate: string
+  dueDate: string
+  returnDate?: string
+  status: 'borrowing' | 'returned' | 'overdue'
+  reminderSent?: boolean
+  reminderCount: number
+  lastReminderAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type NotificationType = 'reminder' | 'system' | 'reservation'
+
+export interface Notification {
+  id: number
+  nickname: string
+  type: NotificationType
+  title: string
+  content: string
+  relatedBookId?: number
+  relatedBookTitle?: string
+  read: boolean
+  createdAt: string
+  emailSent?: boolean
+  emailSentAt?: string
+}
+
+export interface BorrowRecordWithBook extends BorrowRecord {
+  book: Book
+}
+
+export interface BookBorrowStatus {
+  borrowed: boolean
+  borrowRecord?: BorrowRecord
+  daysRemaining?: number
+  isOverdue?: boolean
+  overdueDays?: number
 }
 
 export interface Review {
@@ -316,9 +360,12 @@ export interface ReaderProfile {
   account: PointsAccount
   logs: PointsLog[]
   borrowHistory: { book: Book; traceLog: TraceLog }[]
+  currentBorrowings: BorrowRecordWithBook[]
+  overdueRecords: BorrowRecordWithBook[]
   reviews: Review[]
   meetups: { meetup: Meetup; registration: Registration }[]
   donations: Book[]
   donationReviews: DonationReview[]
   notes: Note[]
+  unreadNotificationCount: number
 }

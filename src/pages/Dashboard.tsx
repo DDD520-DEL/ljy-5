@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus, Star, User, Heart, PenLine, Flame } from 'lucide-react'
+import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus, Star, User, Heart, PenLine, Flame, AlertTriangle, Megaphone, CheckCircle, CalendarClock, AlertCircle } from 'lucide-react'
 import { bookApi, meetupApi, reservationApi, noteApi } from '@/lib/api'
-import { formatDate, sourceTypeLabel, sourceTypeColor, meetupStatusLabel, meetupStatusColor, readerLevelLabel, readerLevelColor, cn } from '@/lib/utils'
-import type { Book as BookType, Meetup, ReaderRanking, Note } from '../../shared/types'
+import { formatDate, sourceTypeLabel, sourceTypeColor, meetupStatusLabel, meetupStatusColor, readerLevelLabel, readerLevelColor, cn, calculateDaysRemaining } from '@/lib/utils'
+import type { Book as BookType, Meetup, ReaderRanking, Note, BorrowRecordWithBook } from '../../shared/types'
 
 export default function Dashboard() {
   const [books, setBooks] = useState<BookType[]>([])
@@ -16,6 +16,10 @@ export default function Dashboard() {
   const [pointsRanking, setPointsRanking] = useState<ReaderRanking[]>([])
   const [borrowCountRanking, setBorrowCountRanking] = useState<ReaderRanking[]>([])
   const [hotNotes, setHotNotes] = useState<Note[]>([])
+  const [activeBorrows, setActiveBorrows] = useState<BorrowRecordWithBook[]>([])
+  const [overdueBorrows, setOverdueBorrows] = useState<BorrowRecordWithBook[]>([])
+  const [sendingReminders, setSendingReminders] = useState<Record<number, boolean>>({})
+  const [reminderSuccess, setReminderSuccess] = useState<number | null>(null)
 
   useEffect(() => {
     loadData()
@@ -23,7 +27,7 @@ export default function Dashboard() {
 
   async function loadData() {
     try {
-      const [allBooks, borrowRank, discussRank, allMeetups, resStats, pointsRank, borrowCountRank, hotNotesData] = await Promise.all([
+      const [allBooks, borrowRank, discussRank, allMeetups, resStats, pointsRank, borrowCountRank, hotNotesData, activeBorrowsData, overdueBorrowsData] = await Promise.all([
         bookApi.list(),
         bookApi.ranking('borrow'),
         bookApi.ranking('discuss'),
@@ -32,6 +36,8 @@ export default function Dashboard() {
         bookApi.readerRanking('points', 8),
         bookApi.readerRanking('borrow', 8),
         noteApi.hot(5, 7),
+        bookApi.getActiveBorrows(),
+        bookApi.getOverdueBorrows(),
       ])
       setBooks(allBooks)
       setBorrowRanking(borrowRank)
@@ -41,10 +47,33 @@ export default function Dashboard() {
       setPointsRanking(pointsRank)
       setBorrowCountRanking(borrowCountRank)
       setHotNotes(hotNotesData)
+      setActiveBorrows(activeBorrowsData)
+      setOverdueBorrows(overdueBorrowsData)
     } catch (err) {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleSendReminder(bookId: number, e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    try {
+      setSendingReminders(prev => ({ ...prev, [bookId]: true }))
+      await bookApi.reminder(bookId)
+      setReminderSuccess(bookId)
+      setTimeout(() => setReminderSuccess(null), 3000)
+      const [active, overdue] = await Promise.all([
+        bookApi.getActiveBorrows(),
+        bookApi.getOverdueBorrows(),
+      ])
+      setActiveBorrows(active)
+      setOverdueBorrows(overdue)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '催还失败')
+    } finally {
+      setSendingReminders(prev => ({ ...prev, [bookId]: false }))
     }
   }
 
@@ -90,6 +119,13 @@ export default function Dashboard() {
       icon: User,
       gradient: 'from-purple-500 to-purple-700',
       bg: 'bg-purple-50',
+    },
+    {
+      label: '逾期图书',
+      value: overdueBorrows.length,
+      icon: AlertTriangle,
+      gradient: overdueBorrows.length > 0 ? 'from-red-500 to-red-700' : 'from-gray-400 to-gray-600',
+      bg: overdueBorrows.length > 0 ? 'bg-red-50' : 'bg-gray-50',
     },
   ]
 
@@ -423,6 +459,257 @@ export default function Dashboard() {
             </Link>
           ))}
         </div>
+      </div>
+
+      {overdueBorrows.length > 0 && (
+        <div className="card p-6 border-2 border-red-200 bg-red-50/30">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <h2 className="section-title text-red-800">逾期未还提醒</h2>
+              <p className="text-sm text-red-600/80">共 {overdueBorrows.length} 本图书已逾期，请及时处理</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {overdueBorrows.map((record) => {
+              const days = calculateDaysRemaining(record.dueDate)
+              return (
+                <div
+                  key={record.id}
+                  className="relative p-4 rounded-xl border-2 border-red-300 bg-white hover:shadow-lg transition-all duration-200 overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 -mr-8 -mt-8 rounded-full" />
+                  <div className="flex gap-3 relative">
+                    <Link to={`/books/${record.bookId}`} className="flex-shrink-0">
+                      <div className="w-16 h-22 rounded-md overflow-hidden bg-coffee-100 shadow-sm">
+                        {record.book.coverImage ? (
+                          <img src={record.book.coverImage} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-coffee-400">
+                            <Book className="w-8 h-8" />
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                    <div className="flex-1 min-w-0">
+                      <Link to={`/books/${record.bookId}`} className="block">
+                        <p className="font-bold text-coffee-900 line-clamp-2 group-hover:text-coffee-700 mb-1">
+                          {record.book.title}
+                        </p>
+                      </Link>
+                      <p className="text-xs text-coffee-500 mb-2">{record.book.author}</p>
+                      <div className="space-y-1 mb-3">
+                        <div className="flex items-center gap-2 text-xs">
+                          <User className="w-3 h-3 text-coffee-400" />
+                          <span className="text-coffee-700 font-medium">{record.borrower}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <CalendarClock className="w-3 h-3 text-red-500" />
+                          <span className="text-red-600 font-semibold">逾期 {Math.abs(days)} 天</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-coffee-500">
+                          <span>应还：{formatDate(record.dueDate)}</span>
+                        </div>
+                        {record.reminderCount > 0 && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <span className="badge border bg-red-100 text-red-700 border-red-200 py-0.5 px-2">
+                              已催 {record.reminderCount} 次
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to={`/books/${record.bookId}`}
+                          className="flex-1 text-xs py-2 rounded-lg bg-coffee-100 text-coffee-700 text-center hover:bg-coffee-200 transition-colors font-medium"
+                        >
+                          查看详情
+                        </Link>
+                        <button
+                          onClick={(e) => handleSendReminder(record.bookId, e)}
+                          disabled={sendingReminders[record.bookId]}
+                          className={cn(
+                            'flex-1 text-xs py-2 rounded-lg text-white text-center font-medium transition-all duration-200 inline-flex items-center justify-center gap-1.5 shadow-sm',
+                            reminderSuccess === record.bookId
+                              ? 'bg-forest-600'
+                              : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700',
+                            sendingReminders[record.bookId] && 'opacity-70 cursor-not-allowed'
+                          )}
+                        >
+                          {sendingReminders[record.bookId] ? (
+                            <span className="inline-flex items-center gap-1">
+                              <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                              发送中
+                            </span>
+                          ) : reminderSuccess === record.bookId ? (
+                            <span className="inline-flex items-center gap-1">
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              已发送
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1">
+                              <Megaphone className="w-3.5 h-3.5" />
+                              催还
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="card p-6">
+        <div className="flex items-center justify-between gap-4 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-coffee-500 to-coffee-700 flex items-center justify-center flex-shrink-0">
+              <CalendarClock className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="section-title">借阅管理</h2>
+              <p className="text-sm text-coffee-500">当前借阅中 {activeBorrows.length} 本，逾期 {overdueBorrows.length} 本</p>
+            </div>
+          </div>
+        </div>
+        {activeBorrows.length === 0 ? (
+          <div className="text-center py-12">
+            <Book className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+            <p className="text-coffee-400">暂无借阅中的图书</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-full">
+              <thead>
+                <tr className="border-b-2 border-coffee-100">
+                  <th className="text-left py-3 px-3 text-xs font-semibold text-coffee-600 uppercase tracking-wider">图书</th>
+                  <th className="text-left py-3 px-3 text-xs font-semibold text-coffee-600 uppercase tracking-wider">借阅人</th>
+                  <th className="text-left py-3 px-3 text-xs font-semibold text-coffee-600 uppercase tracking-wider">借阅日</th>
+                  <th className="text-left py-3 px-3 text-xs font-semibold text-coffee-600 uppercase tracking-wider">应还日</th>
+                  <th className="text-left py-3 px-3 text-xs font-semibold text-coffee-600 uppercase tracking-wider">状态</th>
+                  <th className="text-left py-3 px-3 text-xs font-semibold text-coffee-600 uppercase tracking-wider">催还</th>
+                  <th className="text-right py-3 px-3 text-xs font-semibold text-coffee-600 uppercase tracking-wider">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-coffee-50">
+                {activeBorrows.slice(0, 10).map((record) => {
+                  const days = calculateDaysRemaining(record.dueDate)
+                  const isOverdue = days < 0
+                  const isWarning = days >= 0 && days <= 7
+                  return (
+                    <tr
+                      key={record.id}
+                      className={cn(
+                        'transition-colors hover:bg-coffee-50/50',
+                        isOverdue && 'bg-red-50/50'
+                      )}
+                    >
+                      <td className="py-3 px-3">
+                        <Link to={`/books/${record.bookId}`} className="flex items-center gap-3">
+                          <div className="w-10 h-14 rounded overflow-hidden bg-coffee-100 flex-shrink-0">
+                            {record.book.coverImage ? (
+                              <img src={record.book.coverImage} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-coffee-400">
+                                <Book className="w-5 h-5" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 max-w-[180px]">
+                            <p className="font-medium text-coffee-800 text-sm truncate">{record.book.title}</p>
+                            <p className="text-xs text-coffee-500 truncate">{record.book.author}</p>
+                          </div>
+                        </Link>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="font-medium text-coffee-700 text-sm">{record.borrower}</span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="text-sm text-coffee-600">{formatDate(record.borrowDate)}</span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className={cn(
+                          "text-sm font-medium",
+                          isOverdue ? "text-red-600" : isWarning ? "text-amber-600" : "text-coffee-600"
+                        )}>
+                          {formatDate(record.dueDate)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className={cn(
+                          "badge border font-medium py-1 px-3",
+                          isOverdue
+                            ? 'bg-red-100 text-red-700 border-red-200'
+                            : isWarning
+                              ? 'bg-amber-100 text-amber-700 border-amber-200'
+                              : 'bg-forest-100 text-forest-700 border-forest-200'
+                        )}>
+                          {isOverdue ? (
+                            <span className="inline-flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              逾期 {Math.abs(days)} 天
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1">
+                              <CalendarClock className="w-3 h-3" />
+                              剩余 {days} 天
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        {record.reminderCount > 0 ? (
+                          <span className="badge border bg-amber-100 text-amber-700 border-amber-200 py-1 px-2 text-xs">
+                            {record.reminderCount} 次
+                          </span>
+                        ) : (
+                          <span className="text-xs text-coffee-400">未催还</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            to={`/books/${record.bookId}`}
+                            className="text-xs px-3 py-1.5 rounded-md bg-coffee-100 text-coffee-700 hover:bg-coffee-200 transition-colors font-medium"
+                          >
+                            查看
+                          </Link>
+                          <button
+                            onClick={(e) => handleSendReminder(record.bookId, e)}
+                            disabled={sendingReminders[record.bookId]}
+                            className={cn(
+                              "text-xs px-3 py-1.5 rounded-md font-medium transition-all duration-200 inline-flex items-center gap-1",
+                              reminderSuccess === record.bookId
+                                ? 'bg-forest-600 text-white'
+                                : isOverdue
+                                  ? 'bg-red-500 text-white hover:bg-red-600 shadow-sm'
+                                  : 'bg-coffee-200 text-coffee-700 hover:bg-coffee-300',
+                              sendingReminders[record.bookId] && 'opacity-70 cursor-not-allowed'
+                            )}
+                          >
+                            {sendingReminders[record.bookId] ? (
+                              <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            ) : reminderSuccess === record.bookId ? (
+                              <CheckCircle className="w-3.5 h-3.5" />
+                            ) : (
+                              <Megaphone className="w-3.5 h-3.5" />
+                            )}
+                            {sendingReminders[record.bookId] ? '发送中' : reminderSuccess === record.bookId ? '已发送' : '催还'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

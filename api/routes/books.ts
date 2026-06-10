@@ -1,6 +1,6 @@
 import express from 'express'
 import QRCode from 'qrcode'
-import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower, getReviewsWithLevel, addPoints, getPointsRanking, getBorrowRanking, getReaderProfile } from '../db'
+import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower, getReviewsWithLevel, addPoints, getPointsRanking, getBorrowRanking, getReaderProfile, createBorrowRecord, getBookBorrowStatusDetail, sendReminder, getAllActiveBorrowRecords, getAllOverdueRecords, getNotifications, markNotificationRead } from '../db'
 import type { CreateBookRequest, CreateReviewRequest, ReaderRanking } from '../../shared/types'
 
 const router = express.Router()
@@ -67,6 +67,32 @@ router.get('/readers/:nickname', (req, res) => {
     return
   }
   res.json(profile)
+})
+
+router.get('/readers/:nickname/notifications', (req, res) => {
+  const { nickname } = req.params
+  const notifications = getNotifications(decodeURIComponent(nickname))
+  res.json(notifications)
+})
+
+router.post('/readers/:nickname/notifications/:id/read', (req, res) => {
+  const { nickname, id } = req.params
+  const result = markNotificationRead(parseInt(id), decodeURIComponent(nickname))
+  if (!result) {
+    res.status(404).json({ error: '通知不存在' })
+    return
+  }
+  res.json({ success: true, notification: result })
+})
+
+router.get('/borrow/active', (req, res) => {
+  const records = getAllActiveBorrowRecords()
+  res.json(records)
+})
+
+router.get('/borrow/overdue', (req, res) => {
+  const records = getAllOverdueRecords()
+  res.json(records)
 })
 
 router.get('/:id', (req, res) => {
@@ -165,13 +191,27 @@ router.post('/:id/borrow', (req, res) => {
     res.status(404).json({ error: '图书不存在' })
     return
   }
+  if (isBookBorrowed(id)) {
+    res.status(400).json({ error: '图书已被借出' })
+    return
+  }
   incrementBorrowCount(id)
-  const { operator, borrower } = req.body as { operator?: string; borrower?: string }
+  const { operator, borrower, contact, borrowDays } = req.body as { 
+    operator?: string; 
+    borrower?: string; 
+    contact?: string;
+    borrowDays?: number;
+  }
   let description = `读者借阅，书店${operator || '管理员'}登记`
   if (borrower) {
     description = `${borrower}借阅该书，书店${operator || '管理员'}登记`
   }
   addTraceLog(id, '借出', description, operator || '管理员')
+
+  let borrowRecord = null
+  if (borrower) {
+    borrowRecord = createBorrowRecord(id, borrower, contact, borrowDays || 30)
+  }
 
   let fulfilledReservation = null
   if (borrower) {
@@ -192,7 +232,8 @@ router.post('/:id/borrow', (req, res) => {
     success: true, 
     borrowCount: book.borrowCount, 
     fulfilledReservation,
-    pointsResult 
+    pointsResult,
+    borrowRecord,
   })
 })
 
@@ -208,6 +249,36 @@ router.post('/:id/return', (req, res) => {
     success: true,
     traceLog: result.traceLog,
     notifiedReservation: result.notifiedReservation,
+    borrowRecord: result.borrowRecord,
+  })
+})
+
+router.post('/:id/reminder', (req, res) => {
+  const id = parseInt(req.params.id)
+  const { operator } = req.body as { operator?: string }
+  const db = getDB()
+  const book = db.books.find(b => b.id === id)
+  if (!book) {
+    res.status(404).json({ error: '图书不存在' })
+    return
+  }
+  const borrowRecord = db.borrowRecords.find(
+    r => r.bookId === id && (r.status === 'borrowing' || r.status === 'overdue')
+  )
+  if (!borrowRecord) {
+    res.status(400).json({ error: '图书未被借出，无需催还' })
+    return
+  }
+  const result = sendReminder(borrowRecord.id, operator)
+  if (!result) {
+    res.status(500).json({ error: '催还提醒发送失败' })
+    return
+  }
+  res.json({
+    success: true,
+    record: result.record,
+    notification: result.notification,
+    traceLog: result.traceLog,
   })
 })
 
@@ -219,9 +290,13 @@ router.get('/:id/status', (req, res) => {
     res.status(404).json({ error: '图书不存在' })
     return
   }
-  const borrowed = isBookBorrowed(id)
+  const status = getBookBorrowStatusDetail(id)
   const reservations = getBookReservations(id)
-  res.json({ borrowed, reservationCount: reservations.length })
+  res.json({ 
+    borrowed: status.borrowed, 
+    reservationCount: reservations.length,
+    borrowStatus: status,
+  })
 })
 
 export default router

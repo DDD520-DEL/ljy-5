@@ -28,10 +28,14 @@ import {
   PenLine,
   Lock,
   Globe,
+  AlertTriangle,
+  Megaphone,
+  CalendarClock,
 } from 'lucide-react'
 import { bookApi, reservationApi, noteApi } from '@/lib/api'
 import {
   formatDateTime,
+  formatDate,
   sourceTypeLabel,
   sourceTypeColor,
   renderStars,
@@ -39,9 +43,12 @@ import {
   readerLevelColor,
   noteVisibilityLabel,
   noteVisibilityColor,
+  traceActionLabel,
+  traceActionColor,
+  calculateDaysRemaining,
   cn,
 } from '@/lib/utils'
-import type { Book as BookType, TraceLog, Review, Reservation, ReviewWithLevel, Note, NoteComment, NoteVisibility } from '../../shared/types'
+import type { Book as BookType, TraceLog, Review, Reservation, ReviewWithLevel, Note, NoteComment, NoteVisibility, BookBorrowStatus } from '../../shared/types'
 
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>()
@@ -64,11 +71,13 @@ export default function BookDetail() {
   const [borrowing, setBorrowing] = useState(false)
   const [borrowSuccess, setBorrowSuccess] = useState(false)
   const [borrowerName, setBorrowerName] = useState('')
+  const [borrowDays, setBorrowDays] = useState(30)
   const [fulfilledReservationName, setFulfilledReservationName] = useState<string | null>(null)
 
   const [showQrcode, setShowQrcode] = useState(false)
 
   const [isBorrowed, setIsBorrowed] = useState(false)
+  const [borrowStatus, setBorrowStatus] = useState<BookBorrowStatus | null>(null)
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [resNickname, setResNickname] = useState('')
   const [resContact, setResContact] = useState('')
@@ -77,6 +86,9 @@ export default function BookDetail() {
   const [returning, setReturning] = useState(false)
   const [returnSuccess, setReturnSuccess] = useState(false)
   const [notifiedName, setNotifiedName] = useState<string | null>(null)
+
+  const [sendingReminder, setSendingReminder] = useState(false)
+  const [reminderSuccess, setReminderSuccess] = useState(false)
 
   const [detailTab, setDetailTab] = useState<'trace' | 'notes'>('trace')
   const [notes, setNotes] = useState<Note[]>([])
@@ -137,6 +149,7 @@ export default function BookDetail() {
       setReviews(reviewsData)
       setQrcodeData(qrcodeDataResult)
       setIsBorrowed(statusData.borrowed)
+      setBorrowStatus(statusData.borrowStatus || null)
       setReservations(reservationsData)
       setNotes(notesData)
 
@@ -196,7 +209,10 @@ export default function BookDetail() {
     if (!book) return
     try {
       setBorrowing(true)
-      const result = await bookApi.borrow(book.id, { borrower: borrowerName.trim() || undefined })
+      const result = await bookApi.borrow(book.id, { 
+        borrower: borrowerName.trim() || undefined,
+        borrowDays: borrowDays,
+      })
       setBorrowSuccess(true)
       setIsBorrowed(true)
       if (result.fulfilledReservation) {
@@ -207,6 +223,7 @@ export default function BookDetail() {
         setFulfilledReservationName(null)
       }, 5000)
       setBorrowerName('')
+      setBorrowDays(30)
       const [bookData, traceData, statusData, reservationsData] = await Promise.all([
         bookApi.get(book.id),
         bookApi.trace(book.id),
@@ -216,6 +233,7 @@ export default function BookDetail() {
       setBook(bookData)
       setTraceLogs(traceData)
       setIsBorrowed(statusData.borrowed)
+      setBorrowStatus(statusData.borrowStatus || null)
       setReservations(reservationsData)
     } catch (err) {
       alert(err instanceof Error ? err.message : '登记失败')
@@ -231,6 +249,7 @@ export default function BookDetail() {
       const result = await bookApi.returnBook(book.id)
       setReturnSuccess(true)
       setIsBorrowed(false)
+      setBorrowStatus(null)
       if (result.notifiedReservation) {
         setNotifiedName(result.notifiedReservation.nickname)
       }
@@ -247,11 +266,32 @@ export default function BookDetail() {
       setBook(bookData)
       setTraceLogs(traceData)
       setIsBorrowed(statusData.borrowed)
+      setBorrowStatus(statusData.borrowStatus || null)
       setReservations(reservationsData)
     } catch (err) {
       alert(err instanceof Error ? err.message : '归还失败')
     } finally {
       setReturning(false)
+    }
+  }
+
+  async function handleReminder() {
+    if (!book) return
+    try {
+      setSendingReminder(true)
+      await bookApi.reminder(book.id)
+      setReminderSuccess(true)
+      setTimeout(() => setReminderSuccess(false), 3000)
+      const [traceData, statusData] = await Promise.all([
+        bookApi.trace(book.id),
+        bookApi.status(book.id),
+      ])
+      setTraceLogs(traceData)
+      setBorrowStatus(statusData.borrowStatus || null)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '催还失败')
+    } finally {
+      setSendingReminder(false)
     }
   }
 
@@ -545,7 +585,112 @@ export default function BookDetail() {
             )}
           </div>
 
-          {isBorrowed && (
+          {isBorrowed && borrowStatus?.borrowRecord && (
+            <div className={cn(
+              "p-4 rounded-xl border",
+              borrowStatus.isOverdue 
+                ? "bg-red-50 border-red-200" 
+                : borrowStatus.daysRemaining !== undefined && borrowStatus.daysRemaining <= 7
+                  ? "bg-amber-50 border-amber-200"
+                  : "bg-coffee-50 border-coffee-200"
+            )}>
+              <div className="flex items-start gap-3">
+                <div className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
+                  borrowStatus.isOverdue 
+                    ? "bg-red-100" 
+                    : borrowStatus.daysRemaining !== undefined && borrowStatus.daysRemaining <= 7
+                      ? "bg-amber-100"
+                      : "bg-coffee-100"
+                )}>
+                  {borrowStatus.isOverdue ? (
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                  ) : (
+                    <CalendarClock className="w-5 h-5 text-coffee-600" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className={cn(
+                      "font-semibold",
+                      borrowStatus.isOverdue ? "text-red-700" : "text-coffee-800"
+                    )}>
+                      {borrowStatus.isOverdue ? "已逾期" : "借阅中"}
+                    </p>
+                    {borrowStatus.borrowRecord.reminderCount > 0 && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">
+                        已催还 {borrowStatus.borrowRecord.reminderCount} 次
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center gap-1 text-coffee-600">
+                        <User className="w-3.5 h-3.5" />
+                        借阅人：{borrowStatus.borrowRecord.borrower}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center gap-1 text-coffee-600">
+                        <Calendar className="w-3.5 h-3.5" />
+                        借阅日期：{formatDate(borrowStatus.borrowRecord.borrowDate)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center gap-1 text-coffee-600">
+                        <Clock className="w-3.5 h-3.5" />
+                        应还日期：{formatDate(borrowStatus.borrowRecord.dueDate)}
+                      </span>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-coffee-100/50">
+                      {borrowStatus.isOverdue ? (
+                        <p className="font-medium text-red-600">
+                          已逾期 {borrowStatus.overdueDays} 天，请尽快归还
+                        </p>
+                      ) : borrowStatus.daysRemaining !== undefined && borrowStatus.daysRemaining <= 7 ? (
+                        <p className="font-medium text-amber-600">
+                          还剩 {borrowStatus.daysRemaining} 天到期
+                        </p>
+                      ) : (
+                        <p className="font-medium text-forest-600">
+                          剩余 {borrowStatus.daysRemaining} 天
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={handleReminder}
+                  disabled={sendingReminder}
+                  className={cn(
+                    "flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                    sendingReminder 
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-red-500 text-white hover:bg-red-600 hover:shadow-md"
+                  )}
+                >
+                  {sendingReminder ? (
+                    <>发送中...</>
+                  ) : (
+                    <>
+                      <Megaphone className="w-4 h-4" />
+                      发送催还提醒
+                    </>
+                  )}
+                </button>
+              </div>
+              {reminderSuccess && (
+                <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  <p className="text-sm font-medium text-emerald-700">催还提醒已发送（站内通知 + 邮件）</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {isBorrowed && (!borrowStatus?.borrowRecord) && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200">
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
               <span className="text-sm font-medium text-red-600">此书已被借出</span>
@@ -585,6 +730,27 @@ export default function BookDetail() {
                   disabled={borrowing}
                   className={cn('input-field', borrowing && 'opacity-50 cursor-not-allowed')}
                 />
+              </div>
+              <div>
+                <label className="label">借阅期限</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[7, 14, 30, 60].map((days) => (
+                    <button
+                      key={days}
+                      type="button"
+                      onClick={() => setBorrowDays(days)}
+                      disabled={borrowing}
+                      className={cn(
+                        'py-2 rounded-lg text-sm font-medium transition-all duration-200 border',
+                        borrowDays === days
+                          ? 'bg-coffee-600 text-white border-coffee-600 shadow-sm'
+                          : 'bg-white text-coffee-600 border-coffee-200 hover:border-coffee-400 hover:bg-coffee-50'
+                      )}
+                    >
+                      {days} 天
+                    </button>
+                  ))}
+                </div>
               </div>
               <button
                 onClick={handleBorrow}
@@ -812,14 +978,36 @@ export default function BookDetail() {
                             'absolute left-0 top-0 w-10 h-10 rounded-full flex items-center justify-center border-2',
                             index === 0
                               ? 'bg-coffee-700 border-coffee-700 text-white'
-                              : 'bg-white border-coffee-200 text-coffee-500'
+                              : log.action === '催还'
+                                ? 'bg-red-50 border-red-300 text-red-600'
+                                : log.action === '借出'
+                                  ? 'bg-coffee-50 border-coffee-300 text-coffee-600'
+                                  : log.action === '归还'
+                                    ? 'bg-forest-50 border-forest-300 text-forest-600'
+                                    : 'bg-white border-coffee-200 text-coffee-500'
                           )}>
-                            <CheckCircle className="w-5 h-5" />
+                            {log.action === '催还' ? (
+                              <Megaphone className="w-5 h-5" />
+                            ) : log.action === '借出' ? (
+                              <BookOpen className="w-5 h-5" />
+                            ) : log.action === '归还' ? (
+                              <RotateCcw className="w-5 h-5" />
+                            ) : (
+                              <CheckCircle className="w-5 h-5" />
+                            )}
                           </div>
-                          <div className="p-4 rounded-xl bg-coffee-50/50 border border-coffee-100 hover:border-coffee-200 transition-colors duration-200">
+                          <div className={cn(
+                            "p-4 rounded-xl border hover:border-coffee-200 transition-colors duration-200",
+                            log.action === '催还' 
+                              ? "bg-red-50/50 border-red-100"
+                              : "bg-coffee-50/50 border-coffee-100"
+                          )}>
                             <div className="flex items-center justify-between gap-2 mb-1.5">
-                              <span className="badge bg-coffee-100 text-coffee-700 font-medium">
-                                {log.action}
+                              <span className={cn(
+                                "badge font-medium border",
+                                traceActionColor[log.action]
+                              )}>
+                                {traceActionLabel[log.action]}
                               </span>
                               <span className="text-xs text-coffee-400 flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />

@@ -23,6 +23,10 @@ import {
   PenLine,
   Lock,
   Globe,
+  AlertTriangle,
+  CalendarClock,
+  Bell,
+  Mail,
 } from 'lucide-react'
 import { bookApi } from '@/lib/api'
 import {
@@ -39,8 +43,9 @@ import {
   noteVisibilityLabel,
   noteVisibilityColor,
   cn,
+  calculateDaysRemaining,
 } from '@/lib/utils'
-import type { ReaderProfile as ReaderProfileType, Review, PointsLog, DonationReview, Note } from '../../shared/types'
+import type { ReaderProfile as ReaderProfileType, Review, PointsLog, DonationReview, Note, BorrowRecordWithBook, Notification } from '../../shared/types'
 
 export default function ReaderProfile() {
   const { nickname } = useParams<{ nickname: string }>()
@@ -48,14 +53,26 @@ export default function ReaderProfile() {
   const [profile, setProfile] = useState<ReaderProfileType | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'history' | 'borrow' | 'reviews' | 'notes' | 'meetups' | 'donations'>('history')
+  const [activeTab, setActiveTab] = useState<'history' | 'borrow' | 'current' | 'overdue' | 'reviews' | 'notes' | 'meetups' | 'donations' | 'notifications'>('history')
+  const [activeBorrows, setActiveBorrows] = useState<BorrowRecordWithBook[]>([])
+  const [overdueBorrows, setOverdueBorrows] = useState<BorrowRecordWithBook[]>([])
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [markingRead, setMarkingRead] = useState<Record<number, boolean>>({})
 
   const loadProfile = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
-      const data = await bookApi.readerProfile(decodeURIComponent(nickname!))
-      setProfile(data)
+      const decodedNickname = decodeURIComponent(nickname!)
+      const [profileData, notifData] = await Promise.all([
+        bookApi.readerProfile(decodedNickname),
+        bookApi.getNotifications(decodedNickname).catch(() => []),
+      ])
+      setProfile(profileData)
+      setNotifications(notifData)
+      const allActive = profileData.currentBorrowings || []
+      setActiveBorrows(allActive)
+      setOverdueBorrows(allActive.filter(b => b.status === 'overdue'))
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
     } finally {
@@ -67,6 +84,18 @@ export default function ReaderProfile() {
     if (!nickname) return
     loadProfile()
   }, [nickname, loadProfile])
+
+  async function handleMarkNotificationRead(id: number) {
+    try {
+      setMarkingRead(prev => ({ ...prev, [id]: true }))
+      await bookApi.markNotificationRead(decodeURIComponent(nickname!), id)
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n))
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setMarkingRead(prev => ({ ...prev, [id]: false }))
+    }
+  }
 
   if (loading) {
     return (
@@ -112,20 +141,29 @@ export default function ReaderProfile() {
 
   const stats = [
     { label: '累计积分', value: account.points, icon: Star, color: 'from-amber-400 to-amber-600', bg: 'bg-amber-50' },
-    { label: '借阅图书', value: account.borrowCount, icon: BookOpen, color: 'from-sky-500 to-sky-700', bg: 'bg-sky-50' },
+    { label: '当前借阅', value: activeBorrows.length, icon: BookOpen, color: 'from-sky-500 to-sky-700', bg: 'bg-sky-50' },
+    { label: '逾期图书', value: overdueBorrows.length, icon: AlertTriangle, color: overdueBorrows.length > 0 ? 'from-red-500 to-red-700' : 'from-gray-400 to-gray-600', bg: overdueBorrows.length > 0 ? 'bg-red-50' : 'bg-gray-50' },
     { label: '发表书评', value: account.reviewCount, icon: MessageSquare, color: 'from-emerald-500 to-emerald-700', bg: 'bg-emerald-50' },
-    { label: '参加读书会', value: account.meetupCount, icon: Users, color: 'from-purple-500 to-purple-700', bg: 'bg-purple-50' },
-    { label: '捐赠图书', value: account.donationCount, icon: Gift, color: 'from-rose-500 to-rose-700', bg: 'bg-rose-50' },
+    { label: '未读通知', value: notifications.filter(n => !n.read).length, icon: Bell, color: notifications.filter(n => !n.read).length > 0 ? 'from-purple-500 to-purple-700' : 'from-gray-400 to-gray-600', bg: notifications.filter(n => !n.read).length > 0 ? 'bg-purple-50' : 'bg-gray-50' },
   ]
 
-  const tabs = [
+  const tabs: Array<{
+    id: 'history' | 'borrow' | 'current' | 'overdue' | 'reviews' | 'notes' | 'meetups' | 'donations' | 'notifications'
+    label: string
+    icon: any
+    count: number
+    badge?: { count: number; color: string }
+  }> = [
     { id: 'history', label: '积分动态', icon: TrendingUp, count: logs.length },
+    { id: 'current', label: '当前借阅', icon: CalendarClock, count: activeBorrows.length, badge: overdueBorrows.length > 0 ? { count: overdueBorrows.length, color: 'bg-red-500 text-white' } : undefined },
+    { id: 'overdue', label: '逾期记录', icon: AlertTriangle, count: overdueBorrows.length, badge: overdueBorrows.length > 0 ? { count: overdueBorrows.length, color: 'bg-red-500 text-white' } : undefined },
     { id: 'borrow', label: '借阅历史', icon: BookOpen, count: borrowHistory.length },
     { id: 'reviews', label: '发表书评', icon: MessageSquare, count: reviews.length },
     { id: 'notes', label: '读书笔记', icon: PenLine, count: notes.length },
+    { id: 'notifications', label: '通知中心', icon: Bell, count: notifications.length, badge: notifications.filter(n => !n.read).length > 0 ? { count: notifications.filter(n => !n.read).length, color: 'bg-red-500 text-white' } : undefined },
     { id: 'meetups', label: '读书会', icon: Users, count: meetups.length },
     { id: 'donations', label: '捐赠图书', icon: Gift, count: donations.length + (donationReviews?.length || 0) },
-  ] as const
+  ]
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -251,7 +289,7 @@ export default function ReaderProfile() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    'px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 whitespace-nowrap',
+                    'px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 whitespace-nowrap relative',
                     activeTab === tab.id
                       ? 'bg-coffee-700 text-white shadow-md'
                       : 'text-coffee-500 hover:text-coffee-700 hover:bg-coffee-50'
@@ -265,6 +303,14 @@ export default function ReaderProfile() {
                       activeTab === tab.id ? 'bg-white/20' : 'bg-coffee-100'
                     )}>
                       {tab.count}
+                    </span>
+                  )}
+                  {tab.badge && (
+                    <span className={cn(
+                      'absolute -top-1 -right-1 w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold shadow',
+                      tab.badge.color
+                    )}>
+                      {tab.badge.count > 99 ? '99+' : tab.badge.count}
                     </span>
                   )}
                 </button>
@@ -304,6 +350,155 @@ export default function ReaderProfile() {
                         </div>
                       </div>
                     ))
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'current' && (
+                <div className="space-y-3">
+                  {activeBorrows.length === 0 ? (
+                    <div className="text-center py-12">
+                      <CalendarClock className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+                      <p className="text-coffee-400">当前没有借阅中的图书</p>
+                    </div>
+                  ) : (
+                    activeBorrows.map((record) => {
+                      const days = calculateDaysRemaining(record.dueDate)
+                      const isOverdue = days < 0
+                      const isWarning = days >= 0 && days <= 7
+                      return (
+                        <Link
+                          key={record.id}
+                          to={`/books/${record.bookId}`}
+                          className={cn(
+                            "flex items-center gap-4 p-4 rounded-xl border group transition-all",
+                            isOverdue
+                              ? "bg-red-50/50 border-red-200 hover:border-red-300"
+                              : "bg-coffee-50/50 border-coffee-100 hover:border-coffee-200"
+                          )}
+                        >
+                          <div className="w-14 h-20 rounded-md overflow-hidden bg-coffee-100 shadow-sm flex-shrink-0">
+                            {record.book.coverImage ? (
+                              <img src={record.book.coverImage} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-coffee-400">
+                                <Book className="w-7 h-7" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-coffee-800 truncate group-hover:text-coffee-600">
+                              {record.book.title}
+                            </p>
+                            <p className="text-sm text-coffee-500 mb-2">{record.book.author}</p>
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span className="inline-flex items-center gap-1 text-coffee-600">
+                                <Calendar className="w-3 h-3" />
+                                借阅：{formatDate(record.borrowDate)}
+                              </span>
+                              <span className={cn(
+                                "inline-flex items-center gap-1 font-medium",
+                                isOverdue ? "text-red-600" : isWarning ? "text-amber-600" : "text-forest-600"
+                              )}>
+                                <CalendarClock className="w-3 h-3" />
+                                应还：{formatDate(record.dueDate)}
+                              </span>
+                              <span className={cn(
+                                "badge border font-medium py-0.5 px-2",
+                                isOverdue
+                                  ? 'bg-red-100 text-red-700 border-red-200'
+                                  : isWarning
+                                    ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                    : 'bg-forest-100 text-forest-700 border-forest-200'
+                              )}>
+                                {isOverdue ? (
+                                  <span className="inline-flex items-center gap-1">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    逾期 {Math.abs(days)} 天
+                                  </span>
+                                ) : (
+                                  <span>剩余 {days} 天</span>
+                                )}
+                              </span>
+                              {record.reminderCount > 0 && (
+                                <span className="badge border bg-amber-100 text-amber-700 border-amber-200 py-0.5 px-2">
+                                  被催 {record.reminderCount} 次
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-coffee-300 group-hover:text-coffee-500 transition-colors flex-shrink-0" />
+                        </Link>
+                      )
+                    })
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'overdue' && (
+                <div className="space-y-3">
+                  {overdueBorrows.length === 0 ? (
+                    <div className="text-center py-12">
+                      <CheckCircle className="w-12 h-12 text-forest-300 mx-auto mb-3" />
+                      <p className="text-coffee-500">太棒了！没有逾期图书</p>
+                      <p className="text-sm text-coffee-400 mt-1">请保持按时还书的好习惯</p>
+                    </div>
+                  ) : (
+                    overdueBorrows.map((record) => {
+                      const days = calculateDaysRemaining(record.dueDate)
+                      return (
+                        <Link
+                          key={record.id}
+                          to={`/books/${record.bookId}`}
+                          className="flex items-center gap-4 p-4 rounded-xl border-2 border-red-300 bg-red-50/60 hover:border-red-400 hover:bg-red-50 group transition-all"
+                        >
+                          <div className="w-14 h-20 rounded-md overflow-hidden bg-coffee-100 shadow-sm flex-shrink-0 relative">
+                            {record.book.coverImage ? (
+                              <img src={record.book.coverImage} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-coffee-400">
+                                <Book className="w-7 h-7" />
+                              </div>
+                            )}
+                            <div className="absolute top-0 left-0 right-0 bg-red-600 text-white text-[10px] py-0.5 text-center font-bold">
+                              OVERDUE
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <p className="font-bold text-coffee-900 truncate group-hover:text-coffee-700">
+                                {record.book.title}
+                              </p>
+                              <span className="badge border bg-red-200 text-red-800 border-red-300 font-bold py-0.5 px-2 flex-shrink-0">
+                                逾期 {Math.abs(days)} 天
+                              </span>
+                            </div>
+                            <p className="text-sm text-coffee-500 mb-2">{record.book.author}</p>
+                            <div className="flex flex-wrap items-center gap-3 text-xs">
+                              <span className="inline-flex items-center gap-1 text-coffee-600">
+                                <Calendar className="w-3 h-3" />
+                                借阅：{formatDate(record.borrowDate)}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-red-700 font-medium">
+                                <CalendarClock className="w-3 h-3" />
+                                应还：{formatDate(record.dueDate)}
+                              </span>
+                              {record.reminderCount > 0 && (
+                                <span className="badge border bg-amber-100 text-amber-700 border-amber-200 py-0.5 px-2 inline-flex items-center gap-1">
+                                  <Bell className="w-3 h-3" />
+                                  被催 {record.reminderCount} 次
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-red-600 mt-2 font-medium flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" />
+                              请尽快归还，以免产生额外费用或影响后续借阅权限
+                            </p>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-red-400 group-hover:text-red-600 transition-colors flex-shrink-0" />
+                        </Link>
+                      )
+                    })
                   )}
                 </div>
               )}
@@ -469,6 +664,100 @@ export default function ReaderProfile() {
                           </span>
                         </div>
                       </Link>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'notifications' && (
+                <div className="space-y-3">
+                  {notifications.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Bell className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+                      <p className="text-coffee-400">暂无通知</p>
+                    </div>
+                  ) : (
+                    notifications.map((notif) => (
+                      <div
+                        key={notif.id}
+                        className={cn(
+                          "p-4 rounded-xl border transition-all",
+                          notif.read
+                            ? "bg-white border-coffee-100"
+                            : "bg-amber-50/50 border-amber-200 shadow-sm"
+                        )}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={cn(
+                            "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
+                            notif.type === 'reminder' ? 'bg-red-100 text-red-600' :
+                            notif.type === 'reservation' ? 'bg-sky-100 text-sky-600' :
+                            'bg-coffee-100 text-coffee-600'
+                          )}>
+                            {notif.type === 'reminder' && <AlertTriangle className="w-5 h-5" />}
+                            {notif.type === 'reservation' && <Calendar className="w-5 h-5" />}
+                            {notif.type === 'system' && <Bell className="w-5 h-5" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <div className="flex items-center gap-2">
+                                <p className={cn(
+                                  "font-semibold",
+                                  notif.read ? 'text-coffee-700' : 'text-coffee-900'
+                                )}>
+                                  {notif.title}
+                                </p>
+                                {!notif.read && (
+                                  <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 mt-1" />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                {notif.emailSent && (
+                                  <span className="badge border bg-sky-100 text-sky-600 border-sky-200 py-0.5 px-1.5 text-[10px] inline-flex items-center gap-0.5">
+                                    <Mail className="w-2.5 h-2.5" />
+                                    邮件
+                                  </span>
+                                )}
+                                {!notif.read && (
+                                  <button
+                                    onClick={() => handleMarkNotificationRead(notif.id)}
+                                    disabled={markingRead[notif.id]}
+                                    className={cn(
+                                      "text-xs px-2 py-1 rounded-md transition-colors font-medium",
+                                      markingRead[notif.id]
+                                        ? 'bg-coffee-100 text-coffee-400'
+                                        : 'bg-coffee-200 text-coffee-700 hover:bg-coffee-300'
+                                    )}
+                                  >
+                                    {markingRead[notif.id] ? '...' : '标已读'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <p className={cn(
+                              "text-sm mb-2",
+                              notif.read ? 'text-coffee-500' : 'text-coffee-600'
+                            )}>
+                              {notif.content}
+                            </p>
+                            <div className="flex items-center gap-3 text-xs">
+                              <span className="text-coffee-400 flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {formatDateTime(notif.createdAt)}
+                              </span>
+                              {notif.relatedBookId && (
+                                <Link
+                                  to={`/books/${notif.relatedBookId}`}
+                                  className="text-coffee-600 hover:text-coffee-800 font-medium inline-flex items-center gap-0.5"
+                                >
+                                  查看图书
+                                  <ChevronRight className="w-3 h-3" />
+                                </Link>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     ))
                   )}
                 </div>

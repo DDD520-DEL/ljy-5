@@ -9,6 +9,11 @@ import {
   Heart,
   Send,
   Library,
+  CheckCircle,
+  Megaphone,
+  RotateCcw,
+  AlertTriangle,
+  Gift,
 } from 'lucide-react'
 import { traceApi, bookApi } from '@/lib/api'
 import {
@@ -17,6 +22,8 @@ import {
   sourceTypeColor,
   renderStars,
   cn,
+  traceActionLabel,
+  traceActionColor,
 } from '@/lib/utils'
 import type { Book, TraceLog, Review } from '../../shared/types'
 
@@ -249,13 +256,39 @@ export default function TraceView() {
               <div className="space-y-5">
                 {traceLogs.map((log) => (
                   <div key={log.id} className="relative pl-8">
-                    <div className="absolute left-0 top-1 w-6 h-6 rounded-full bg-white border-2 border-coffee-400 flex items-center justify-center">
-                      <div className="w-2 h-2 rounded-full bg-coffee-500" />
+                    <div className={cn(
+                      "absolute left-0 top-1 w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                      log.action === '催还' ? 'bg-red-50 border-red-400' :
+                      log.action === '借出' ? 'bg-coffee-50 border-coffee-500' :
+                      log.action === '归还' ? 'bg-forest-50 border-forest-400' :
+                      log.action === '捐赠' ? 'bg-amber-50 border-amber-400' :
+                      'bg-white border-coffee-400'
+                    )}>
+                      {log.action === '催还' ? (
+                        <Megaphone className="w-3 h-3 text-red-600" />
+                      ) : log.action === '借出' ? (
+                        <BookOpen className="w-3 h-3 text-coffee-600" />
+                      ) : log.action === '归还' ? (
+                        <RotateCcw className="w-3 h-3 text-forest-600" />
+                      ) : log.action === '捐赠' ? (
+                        <Gift className="w-3 h-3 text-amber-600" />
+                      ) : (
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          log.action === '入库' ? 'bg-sky-500' : 'bg-coffee-500'
+                        )} />
+                      )}
                     </div>
-                    <div className="bg-coffee-50/50 rounded-lg p-3">
+                    <div className={cn(
+                      "rounded-lg p-3",
+                      log.action === '催还' ? 'bg-red-50/50 border border-red-100' : 'bg-coffee-50/50'
+                    )}>
                       <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="font-medium text-coffee-800">
-                          {log.action}
+                        <span className={cn(
+                          "badge border font-medium",
+                          traceActionColor[log.action]
+                        )}>
+                          {traceActionLabel[log.action]}
                         </span>
                         <span className="text-xs text-coffee-400">
                           {formatDateTime(log.timestamp)}

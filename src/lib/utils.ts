@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { SourceType, MeetupStatus, ReaderLevel, PointsActionType, DonationReviewStatus, NoteVisibility } from '../../shared/types'
+import type { SourceType, MeetupStatus, ReaderLevel, PointsActionType, DonationReviewStatus, NoteVisibility, TraceLog } from '../../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../../shared/types'
 
 export function cn(...inputs: ClassValue[]) {
@@ -43,6 +43,33 @@ export const sourceTypeColor: Record<SourceType, string> = {
   donation: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   direct: 'bg-sky-50 text-sky-700 border-sky-200',
   secondhand: 'bg-amber-50 text-amber-700 border-amber-200',
+}
+
+export const traceActionLabel: Record<TraceLog['action'], string> = {
+  '入库': '入库',
+  '借出': '借出',
+  '归还': '归还',
+  '捐赠': '捐赠',
+  '转让': '转让',
+  '催还': '催还',
+}
+
+export const traceActionColor: Record<TraceLog['action'], string> = {
+  '入库': 'bg-sky-100 text-sky-700 border-sky-200',
+  '借出': 'bg-coffee-100 text-coffee-700 border-coffee-200',
+  '归还': 'bg-forest-100 text-forest-700 border-forest-200',
+  '捐赠': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  '转让': 'bg-purple-100 text-purple-700 border-purple-200',
+  '催还': 'bg-red-100 text-red-700 border-red-200',
+}
+
+export function calculateDaysRemaining(dueDate: string): number {
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const due = new Date(dueDate)
+  due.setHours(0, 0, 0, 0)
+  const diffTime = due.getTime() - now.getTime()
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 }
 
 export const meetupStatusLabel: Record<MeetupStatus, string> = {

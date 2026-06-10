@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -375,6 +375,8 @@ export interface Database {
   notes: Note[]
   noteComments: NoteComment[]
   noteLikes: NoteLike[]
+  borrowRecords: BorrowRecord[]
+  notifications: Notification[]
   nextBookId: number
   nextTraceLogId: number
   nextReviewId: number
@@ -388,10 +390,25 @@ export interface Database {
   nextNoteId: number
   nextNoteCommentId: number
   nextNoteLikeId: number
+  nextBorrowRecordId: number
+  nextNotificationId: number
 }
 
 const initialCheckIns: CheckIn[] = [
   { id: 1, meetupId: 2, registrationId: 3, nickname: '小王子的玫瑰', createdAt: '2026-05-15T13:55:00.000Z' }
+]
+
+const today = new Date('2026-06-11T00:00:00.000Z')
+const daysAgo = (d: number) => new Date(today.getTime() - d * 86400000).toISOString()
+const daysLater = (d: number) => new Date(today.getTime() + d * 86400000).toISOString()
+
+const initialBorrowRecords: BorrowRecord[] = [
+  { id: 1, bookId: 1, borrower: '夜读者', borrowDate: daysAgo(45), dueDate: daysAgo(15), status: 'overdue', reminderCount: 1, lastReminderAt: daysAgo(10), createdAt: daysAgo(45), updatedAt: daysAgo(10) },
+  { id: 2, bookId: 2, borrower: '童话少女', borrowDate: daysAgo(10), dueDate: daysLater(20), status: 'borrowing', reminderCount: 0, createdAt: daysAgo(10), updatedAt: daysAgo(10) },
+]
+
+const initialNotifications: Notification[] = [
+  { id: 1, nickname: '夜读者', type: 'reminder', title: '图书借阅到期提醒', content: '您借阅的《百年孤独》已于 2026年5月27日到期，请尽快归还。', relatedBookId: 1, relatedBookTitle: '百年孤独', read: false, createdAt: daysAgo(10), emailSent: true, emailSentAt: daysAgo(10) },
 ]
 
 const initialDB: Database = {
@@ -410,6 +427,8 @@ const initialDB: Database = {
   notes: initialNotes,
   noteComments: initialNoteComments,
   noteLikes: initialNoteLikes,
+  borrowRecords: initialBorrowRecords,
+  notifications: initialNotifications,
   nextBookId: 6,
   nextTraceLogId: 9,
   nextReviewId: 9,
@@ -423,6 +442,8 @@ const initialDB: Database = {
   nextNoteId: 7,
   nextNoteCommentId: 16,
   nextNoteLikeId: 13,
+  nextBorrowRecordId: 3,
+  nextNotificationId: 2,
 }
 
 let db: Database = initialDB
@@ -449,9 +470,27 @@ function loadDB(): Database {
         parsed.nextCheckInId = 1
         saveDB(parsed as Database)
       }
+
+      if (!parsed.borrowRecords) {
+        parsed.borrowRecords = []
+        parsed.nextBorrowRecordId = 1
+        console.log('[DB Migration] 初始化借阅记录表')
+      }
+      if (!parsed.notifications) {
+        parsed.notifications = []
+        parsed.nextNotificationId = 1
+        console.log('[DB Migration] 初始化通知表')
+      }
+      if (parsed.nextBorrowRecordId === undefined) {
+        parsed.nextBorrowRecordId = (parsed.borrowRecords?.length || 0) + 1
+      }
+      if (parsed.nextNotificationId === undefined) {
+        parsed.nextNotificationId = (parsed.notifications?.length || 0) + 1
+      }
       
       console.log(`[DB] 已从 ${DATA_FILE} 加载数据`)
       console.log(`[DB] 图书: ${parsed.books?.length || 0} 本 | 读书会: ${parsed.meetups?.length || 0} 个 | 短评: ${parsed.reviews?.length || 0} 条 | 笔记: ${parsed.notes?.length || 0} 条`)
+      console.log(`[DB] 借阅记录: ${parsed.borrowRecords?.length || 0} 条 | 通知: ${parsed.notifications?.length || 0} 条`)
       return parsed as Database
     } catch (err) {
       console.error('[DB] 数据文件读取失败，使用初始数据:', err)
@@ -686,10 +725,231 @@ export function incrementBorrowCount(bookId: number): void {
 }
 
 export function isBookBorrowed(bookId: number): boolean {
+  const activeRecord = db.borrowRecords.find(
+    r => r.bookId === bookId && (r.status === 'borrowing' || r.status === 'overdue')
+  )
+  if (activeRecord) return true
   const logs = db.traceLogs
     .filter(l => l.bookId === bookId)
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
   return logs.length > 0 && logs[0].action === '借出'
+}
+
+export function getActiveBorrowRecord(bookId: number): BorrowRecord | null {
+  const now = new Date()
+  const record = db.borrowRecords.find(
+    r => r.bookId === bookId && (r.status === 'borrowing' || r.status === 'overdue')
+  ) || null
+  if (record && record.status === 'borrowing') {
+    const dueDate = new Date(record.dueDate)
+    if (now > dueDate) {
+      record.status = 'overdue'
+      record.updatedAt = now.toISOString()
+      persistDB()
+    }
+  }
+  return record
+}
+
+export function calculateDaysRemaining(dueDate: string): { daysRemaining: number; isOverdue: boolean; overdueDays: number } {
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const due = new Date(dueDate)
+  due.setHours(0, 0, 0, 0)
+  const diffTime = due.getTime() - now.getTime()
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  return {
+    daysRemaining: Math.max(0, diffDays),
+    isOverdue: diffDays < 0,
+    overdueDays: Math.max(0, -diffDays),
+  }
+}
+
+export function getBookBorrowStatusDetail(bookId: number): BookBorrowStatus {
+  const record = getActiveBorrowRecord(bookId)
+  if (!record) {
+    return { borrowed: false }
+  }
+  const { daysRemaining, isOverdue, overdueDays } = calculateDaysRemaining(record.dueDate)
+  return {
+    borrowed: true,
+    borrowRecord: record,
+    daysRemaining,
+    isOverdue,
+    overdueDays,
+  }
+}
+
+export function createBorrowRecord(
+  bookId: number,
+  borrower: string,
+  contact?: string,
+  borrowDays: number = 30
+): BorrowRecord {
+  const now = new Date()
+  const borrowDate = now.toISOString()
+  const dueDate = new Date(now.getTime() + borrowDays * 86400000).toISOString()
+  const record: BorrowRecord = {
+    id: db.nextBorrowRecordId++,
+    bookId,
+    borrower,
+    contact,
+    borrowDate,
+    dueDate,
+    status: 'borrowing',
+    reminderCount: 0,
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+  }
+  db.borrowRecords.push(record)
+  persistDB()
+  console.log(`[Borrow] 创建借阅记录: ${borrower} 借阅图书#${bookId}, 期限${borrowDays}天`)
+  return record
+}
+
+export function closeBorrowRecord(bookId: number): BorrowRecord | null {
+  const record = getActiveBorrowRecord(bookId)
+  if (!record) return null
+  record.returnDate = new Date().toISOString()
+  record.status = 'returned'
+  record.updatedAt = new Date().toISOString()
+  persistDB()
+  console.log(`[Borrow] 关闭借阅记录: 图书#${bookId} 已归还`)
+  return record
+}
+
+export function getAllActiveBorrowRecords(): BorrowRecordWithBook[] {
+  const now = new Date()
+  return db.borrowRecords
+    .filter(r => r.status === 'borrowing' || r.status === 'overdue')
+    .map(r => {
+      if (r.status === 'borrowing') {
+        const dueDate = new Date(r.dueDate)
+        if (now > dueDate) {
+          r.status = 'overdue'
+          r.updatedAt = now.toISOString()
+        }
+      }
+      const book = db.books.find(b => b.id === r.bookId)
+      return book ? { ...r, book } : null
+    })
+    .filter((item): item is BorrowRecordWithBook => item !== null)
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+}
+
+export function getAllOverdueRecords(): BorrowRecordWithBook[] {
+  return getAllActiveBorrowRecords().filter(r => r.status === 'overdue')
+}
+
+export function getActiveBorrowRecordsByBorrower(borrower: string): BorrowRecordWithBook[] {
+  return getAllActiveBorrowRecords().filter(r => r.borrower === borrower)
+}
+
+export function getOverdueRecordsByBorrower(borrower: string): BorrowRecordWithBook[] {
+  return getAllActiveBorrowRecords().filter(
+    r => r.borrower === borrower && r.status === 'overdue'
+  )
+}
+
+export function createNotification(
+  nickname: string,
+  type: NotificationType,
+  title: string,
+  content: string,
+  relatedBookId?: number,
+  relatedBookTitle?: string
+): Notification {
+  const notification: Notification = {
+    id: db.nextNotificationId++,
+    nickname,
+    type,
+    title,
+    content,
+    relatedBookId,
+    relatedBookTitle,
+    read: false,
+    createdAt: new Date().toISOString(),
+  }
+  db.notifications.push(notification)
+  persistDB()
+  console.log(`[Notify] 创建通知: ${nickname} - ${title}`)
+  return notification
+}
+
+export function sendReminder(
+  borrowRecordId: number,
+  operator?: string
+): { record: BorrowRecord; notification: Notification; traceLog: TraceLog } | null {
+  const record = db.borrowRecords.find(r => r.id === borrowRecordId)
+  if (!record || record.status === 'returned') {
+    return null
+  }
+  const book = db.books.find(b => b.id === record.bookId)
+  const { overdueDays, daysRemaining, isOverdue } = calculateDaysRemaining(record.dueDate)
+  const bookTitle = book?.title || `图书#${record.bookId}`
+
+  let title: string
+  let content: string
+  if (isOverdue) {
+    title = '图书借阅逾期提醒'
+    content = `您借阅的《${bookTitle}》已逾期 ${overdueDays} 天（应还日期：${new Date(record.dueDate).toLocaleDateString('zh-CN')}），请尽快归还，以免影响您的信用。`
+  } else {
+    title = '图书借阅即将到期提醒'
+    content = `您借阅的《${bookTitle}》还有 ${daysRemaining} 天到期（应还日期：${new Date(record.dueDate).toLocaleDateString('zh-CN')}），请注意按时归还或办理续借。`
+  }
+
+  const notification = createNotification(
+    record.borrower,
+    'reminder',
+    title,
+    content,
+    record.bookId,
+    bookTitle
+  )
+
+  try {
+    notification.emailSent = true
+    notification.emailSentAt = new Date().toISOString()
+    console.log(`[Email] 模拟发送催还邮件至 ${record.borrower}: ${title}`)
+  } catch (err) {
+    console.error('[Email] 邮件发送失败:', err)
+  }
+
+  record.reminderCount++
+  record.reminderSent = true
+  record.lastReminderAt = new Date().toISOString()
+  record.updatedAt = new Date().toISOString()
+
+  const traceLog = addTraceLog(
+    record.bookId,
+    '催还',
+    `${operator || '管理员'}向借阅人「${record.borrower}」发送催还提醒（第${record.reminderCount}次）`,
+    operator || '管理员'
+  )
+
+  persistDB()
+  console.log(`[Reminder] 催还提醒已发送: ${record.borrower} - 《${bookTitle}》`)
+  return { record, notification, traceLog }
+}
+
+export function getNotifications(nickname: string): Notification[] {
+  return db.notifications
+    .filter(n => n.nickname === nickname)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+export function markNotificationRead(notificationId: number, nickname: string): Notification | null {
+  const notification = db.notifications.find(
+    n => n.id === notificationId && n.nickname === nickname
+  )
+  if (!notification) return null
+  notification.read = true
+  persistDB()
+  return notification
+}
+
+export function getUnreadNotificationCount(nickname: string): number {
+  return db.notifications.filter(n => n.nickname === nickname && !n.read).length
 }
 
 export function addReservation(bookId: number, data: Omit<Reservation, 'id' | 'bookId' | 'status' | 'position' | 'createdAt'>): Reservation | null {
@@ -791,7 +1051,7 @@ export function fulfillReservationByBorrower(bookId: number, nickname: string): 
   return reservation
 }
 
-export function returnBook(bookId: number, operator?: string): { book: Book; traceLog: TraceLog; notifiedReservation: Reservation | null } | null {
+export function returnBook(bookId: number, operator?: string): { book: Book; traceLog: TraceLog; notifiedReservation: Reservation | null; borrowRecord: BorrowRecord | null } | null {
   const book = db.books.find(b => b.id === bookId)
   if (!book) {
     return null
@@ -800,9 +1060,10 @@ export function returnBook(bookId: number, operator?: string): { book: Book; tra
     return null
   }
   const traceLog = addTraceLog(bookId, '归还', `读者归还图书，书店${operator || '管理员'}登记`, operator || '管理员')
+  const borrowRecord = closeBorrowRecord(bookId)
   const notifiedReservation = notifyNextInQueue(bookId)
   persistDB()
-  return { book, traceLog, notifiedReservation }
+  return { book, traceLog, notifiedReservation, borrowRecord }
 }
 
 export function getAllReservationsWithBookInfo(): { reservation: Reservation; book: Book }[] {
@@ -969,11 +1230,14 @@ export function getReaderProfile(nickname: string): ReaderProfile | null {
     account,
     logs,
     borrowHistory,
+    currentBorrowings: getActiveBorrowRecordsByBorrower(nickname),
+    overdueRecords: getOverdueRecordsByBorrower(nickname),
     reviews,
     meetups,
     donations,
     donationReviews,
     notes,
+    unreadNotificationCount: getUnreadNotificationCount(nickname),
   }
 }
 
