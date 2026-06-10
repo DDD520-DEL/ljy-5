@@ -95,6 +95,26 @@ export default function BookDetail() {
   const [submittingComments, setSubmittingComments] = useState<Record<number, boolean>>({})
   const [likedNotes, setLikedNotes] = useState<Record<number, boolean>>({})
   const [likingNotes, setLikingNotes] = useState<Record<number, boolean>>({})
+  const [likeNickname, setLikeNickname] = useState('')
+
+  async function refreshLikedNotes(noteList: Note[], nickname: string) {
+    if (!nickname.trim() || noteList.length === 0) {
+      setLikedNotes({})
+      return
+    }
+    try {
+      const likedResults = await Promise.all(
+        noteList.map(note => noteApi.hasLiked(note.id, nickname.trim()))
+      )
+      const likedMap: Record<number, boolean> = {}
+      noteList.forEach((note, index) => {
+        likedMap[note.id] = likedResults[index].liked
+      })
+      setLikedNotes(likedMap)
+    } catch (err) {
+      console.error('初始化点赞状态失败:', err)
+    }
+  }
 
   const loadData = useCallback(async () => {
     try {
@@ -119,17 +139,29 @@ export default function BookDetail() {
       setIsBorrowed(statusData.borrowed)
       setReservations(reservationsData)
       setNotes(notesData)
+
+      if (likeNickname.trim()) {
+        refreshLikedNotes(notesData, likeNickname)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, likeNickname])
 
   useEffect(() => {
     if (!id) return
     loadData()
   }, [id, loadData])
+
+  useEffect(() => {
+    if (notes.length > 0 && likeNickname.trim()) {
+      refreshLikedNotes(notes, likeNickname)
+    } else {
+      setLikedNotes({})
+    }
+  }, [likeNickname, notes])
 
   async function handleSubmitReview(e: React.FormEvent) {
     e.preventDefault()
@@ -274,14 +306,14 @@ export default function BookDetail() {
     }
   }
 
-  async function handleToggleLike(noteId: number, nickname: string) {
-    if (!nickname.trim()) {
-      alert('请先输入昵称')
+  async function handleToggleLike(noteId: number) {
+    if (!likeNickname.trim()) {
+      alert('请先在上方输入您的昵称')
       return
     }
     try {
       setLikingNotes(prev => ({ ...prev, [noteId]: true }))
-      const result = await noteApi.like(noteId, nickname.trim())
+      const result = await noteApi.like(noteId, likeNickname.trim())
       setLikedNotes(prev => ({ ...prev, [noteId]: result.liked }))
       setNotes(prev => prev.map(n => n.id === noteId ? result.note : n))
     } catch (err) {
@@ -975,6 +1007,27 @@ export default function BookDetail() {
                   </form>
                 )}
 
+                {notes.length > 0 && (
+                  <div className="p-4 rounded-xl bg-coffee-50/50 border border-coffee-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Heart className="w-4 h-4 text-coffee-500" />
+                      <span className="text-sm font-medium text-coffee-700">点赞用户身份</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={likeNickname}
+                      onChange={(e) => setLikeNickname(e.target.value)}
+                      placeholder="请输入您的昵称以记录点赞身份"
+                      className="input-field"
+                    />
+                    {likeNickname.trim() && (
+                      <p className="text-xs text-coffee-500 mt-2">
+                        已识别身份：<span className="font-medium text-coffee-700">{likeNickname.trim()}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {notes.length === 0 ? (
                   <div className="text-center py-12">
                     <PenLine className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
@@ -1032,7 +1085,7 @@ export default function BookDetail() {
 
                         <div className="flex items-center gap-4 pt-2 border-t border-coffee-100">
                           <button
-                            onClick={() => handleToggleLike(note.id, noteNickname || note.nickname)}
+                            onClick={() => handleToggleLike(note.id)}
                             disabled={likingNotes[note.id]}
                             className={cn(
                               'flex items-center gap-1 text-sm transition-colors',
