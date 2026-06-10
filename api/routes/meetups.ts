@@ -1,6 +1,7 @@
 import express from 'express'
-import { getDB, addMeetup, registerMeetup, updateMeetupSummary, getPointsAccount } from '../db'
-import type { CreateMeetupRequest, RegisterMeetupRequest, UpdateMeetupSummaryRequest } from '../../shared/types'
+import QRCode from 'qrcode'
+import { getDB, addMeetup, registerMeetup, updateMeetupSummary, getPointsAccount, checkInMeetup, getCheckInsByMeetup, getMeetupCheckInStats } from '../db'
+import type { CreateMeetupRequest, RegisterMeetupRequest, UpdateMeetupSummaryRequest, CheckInRequest } from '../../shared/types'
 
 const router = express.Router()
 
@@ -30,7 +31,76 @@ router.get('/:id', (req, res) => {
     const account = getPointsAccount(r.nickname)
     return { ...r, level: account?.level || null }
   })
-  res.json({ ...meetup, registrations })
+  
+  const checkIns = getCheckInsByMeetup(id)
+  const stats = getMeetupCheckInStats(id)
+  
+  res.json({ ...meetup, registrations, checkIns, checkInStats: stats })
+})
+
+router.get('/:id/qrcode', async (req, res) => {
+  try {
+    const db = getDB()
+    const id = parseInt(req.params.id)
+    const meetup = db.meetups.find(m => m.id === id)
+    if (!meetup) {
+      res.status(404).json({ error: '读书会不存在' })
+      return
+    }
+    
+    const checkInUrl = `${req.protocol}://${req.get('host')}/meetups/${id}/checkin`
+    const qrCodeDataUrl = await QRCode.toDataURL(checkInUrl, {
+      width: 300,
+      margin: 2,
+      color: {
+        dark: '#5C4033',
+        light: '#FFFFFF'
+      }
+    })
+    
+    res.json({
+      qrcode: qrCodeDataUrl,
+      checkInUrl,
+      meetupId: id,
+      meetupTitle: meetup.title
+    })
+  } catch (err) {
+    console.error('QR Code generation error:', err)
+    res.status(500).json({ error: '二维码生成失败' })
+  }
+})
+
+router.post('/:id/checkin', (req, res) => {
+  const id = parseInt(req.params.id)
+  const body = req.body as CheckInRequest
+  
+  if (!body.nickname) {
+    res.status(400).json({ error: '请填写昵称' })
+    return
+  }
+  
+  const result = checkInMeetup(id, body.nickname.trim())
+  if ('error' in result) {
+    res.status(400).json({ error: result.error })
+    return
+  }
+  
+  const stats = getMeetupCheckInStats(id)
+  res.status(201).json({ ...result, checkInStats: stats })
+})
+
+router.get('/:id/checkins', (req, res) => {
+  const id = parseInt(req.params.id)
+  const db = getDB()
+  const meetup = db.meetups.find(m => m.id === id)
+  if (!meetup) {
+    res.status(404).json({ error: '读书会不存在' })
+    return
+  }
+  
+  const checkIns = getCheckInsByMeetup(id)
+  const stats = getMeetupCheckInStats(id)
+  res.json({ checkIns, stats })
 })
 
 router.post('/', (req, res) => {
@@ -65,8 +135,7 @@ router.post('/:id/register', (req, res) => {
   }
   
   res.status(201).json({ 
-    registration: result.registration, 
-    pointsResult: result.pointsResult 
+    registration: result.registration
   })
 })
 

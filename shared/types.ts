@@ -83,6 +83,16 @@ export interface Registration {
   nickname: string
   contact?: string
   createdAt: string
+  checkedIn?: boolean
+  checkedInAt?: string
+}
+
+export interface CheckIn {
+  id: number
+  meetupId: number
+  registrationId: number
+  nickname: string
+  createdAt: string
 }
 
 export interface SubmitDonationRequest {
@@ -148,6 +158,26 @@ export interface CreateMeetupRequest {
 export interface RegisterMeetupRequest {
   nickname: string
   contact?: string
+}
+
+export interface CheckInRequest {
+  nickname: string
+}
+
+export interface CheckInResponse {
+  checkIn: CheckIn
+  pointsResult?: {
+    account: PointsAccount
+    log: PointsLog
+    levelUp: boolean
+  }
+}
+
+export interface MeetupCheckInStats {
+  totalRegistered: number
+  totalCheckedIn: number
+  checkInRate: number
+  checkIns: CheckIn[]
 }
 
 export type ReservationStatus = 'waiting' | 'notified' | 'cancelled' | 'fulfilled'

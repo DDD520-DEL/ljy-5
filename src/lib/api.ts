@@ -23,6 +23,9 @@ import type {
   NoteComment,
   CreateNoteRequest,
   CreateNoteCommentRequest,
+  CheckIn,
+  CheckInRequest,
+  MeetupCheckInStats,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -96,11 +99,11 @@ export const meetupApi = {
   list: (status?: string) =>
     request<Meetup[]>(`/meetups${status ? `?status=${status}` : ''}`),
   get: (id: number) =>
-    request<Meetup & { registrations: Registration[] }>(`/meetups/${id}`),
+    request<Meetup & { registrations: (Registration & { level?: string })[]; checkIns: CheckIn[]; checkInStats: MeetupCheckInStats }>(`/meetups/${id}`),
   create: (data: CreateMeetupRequest) =>
     request<Meetup>('/meetups', { method: 'POST', body: JSON.stringify(data) }),
   register: (id: number, data: RegisterMeetupRequest) =>
-    request<Registration>(`/meetups/${id}/register`, {
+    request<{ registration: Registration }>(`/meetups/${id}/register`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -109,6 +112,19 @@ export const meetupApi = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  getQrcode: (id: number) =>
+    request<{ qrcode: string; checkInUrl: string; meetupId: number; meetupTitle: string }>(`/meetups/${id}/qrcode`),
+  checkIn: (id: number, data: CheckInRequest) =>
+    request<{
+      checkIn: CheckIn
+      pointsResult?: { account: PointsAccount; log: PointsLog; levelUp: boolean }
+      checkInStats: MeetupCheckInStats
+    }>(`/meetups/${id}/checkin`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getCheckIns: (id: number) =>
+    request<{ checkIns: CheckIn[]; stats: MeetupCheckInStats }>(`/meetups/${id}/checkins`),
 }
 
 export const reservationApi = {

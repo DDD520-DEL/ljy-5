@@ -9,6 +9,7 @@ import TraceView from "@/pages/TraceView";
 import MeetupList from "@/pages/MeetupList";
 import MeetupCreate from "@/pages/MeetupCreate";
 import MeetupDetail from "@/pages/MeetupDetail";
+import MeetupCheckIn from "@/pages/MeetupCheckIn";
 import ReservationManage from "@/pages/ReservationManage";
 import ReaderProfile from "@/pages/ReaderProfile";
 import DonationReviewPage from "@/pages/DonationReview";
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/meetups" element={<MeetupList />} />
           <Route path="/meetups/new" element={<MeetupCreate />} />
           <Route path="/meetups/:id" element={<MeetupDetail />} />
+          <Route path="/meetups/:id/checkin" element={<MeetupCheckIn />} />
           <Route path="/reservations" element={<ReservationManage />} />
           <Route path="/readers/:nickname" element={<ReaderProfile />} />
         </Route>

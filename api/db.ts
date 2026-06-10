@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -367,6 +367,7 @@ export interface Database {
   reviews: Review[]
   meetups: Meetup[]
   registrations: Registration[]
+  checkIns: CheckIn[]
   reservations: Reservation[]
   pointsAccounts: PointsAccount[]
   pointsLogs: PointsLog[]
@@ -379,6 +380,7 @@ export interface Database {
   nextReviewId: number
   nextMeetupId: number
   nextRegistrationId: number
+  nextCheckInId: number
   nextReservationId: number
   nextPointsAccountId: number
   nextPointsLogId: number
@@ -388,12 +390,19 @@ export interface Database {
   nextNoteLikeId: number
 }
 
+const initialCheckIns: CheckIn[] = [
+  { id: 1, meetupId: 2, registrationId: 3, nickname: '小王子的玫瑰', createdAt: '2026-05-15T13:55:00.000Z' }
+]
+
 const initialDB: Database = {
   books: initialBooks,
   traceLogs: initialTraceLogs,
   reviews: initialReviews,
   meetups: initialMeetups,
-  registrations: initialRegistrations,
+  registrations: initialRegistrations.map(r => 
+    r.id === 3 ? { ...r, checkedIn: true, checkedInAt: '2026-05-15T13:55:00.000Z' } : r
+  ),
+  checkIns: initialCheckIns,
   reservations: initialReservations,
   pointsAccounts: initialPointsAccounts,
   pointsLogs: initialPointsLogs,
@@ -406,6 +415,7 @@ const initialDB: Database = {
   nextReviewId: 9,
   nextMeetupId: 4,
   nextRegistrationId: 4,
+  nextCheckInId: 2,
   nextReservationId: 4,
   nextPointsAccountId: 12,
   nextPointsLogId: 10,
@@ -431,6 +441,12 @@ function loadDB(): Database {
         parsed.nextNoteId = 7
         parsed.nextNoteCommentId = 16
         parsed.nextNoteLikeId = 13
+        saveDB(parsed as Database)
+      }
+      
+      if (!parsed.checkIns) {
+        parsed.checkIns = []
+        parsed.nextCheckInId = 1
         saveDB(parsed as Database)
       }
       
@@ -565,33 +581,83 @@ export function addMeetup(data: Omit<Meetup, 'id' | 'currentParticipants' | 'sta
   return meetup
 }
 
-export function registerMeetup(meetupId: number, data: Omit<Registration, 'id' | 'meetupId' | 'createdAt'>): { registration: Registration; pointsResult?: ReturnType<typeof addPoints> } | null {
+export function registerMeetup(meetupId: number, data: Omit<Registration, 'id' | 'meetupId' | 'createdAt'>): { registration: Registration } | null {
   const meetup = db.meetups.find(m => m.id === meetupId)
   if (!meetup || meetup.currentParticipants >= meetup.maxParticipants) {
     return null
+  }
+  
+  const existingReg = db.registrations.find(r => r.meetupId === meetupId && r.nickname === data.nickname)
+  if (existingReg) {
+    return { registration: existingReg }
   }
   
   const registration: Registration = {
     ...data,
     id: db.nextRegistrationId++,
     meetupId,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    checkedIn: false,
   }
   db.registrations.push(registration)
   meetup.currentParticipants++
-
-  let pointsResult
-  if (data.nickname) {
-    pointsResult = addPoints(
-      data.nickname,
-      'meetup',
-      `参加《${meetup.title}》读书会`,
-      meetupId
-    )
-  }
   
   persistDB()
-  return { registration, pointsResult }
+  return { registration }
+}
+
+export function checkInMeetup(meetupId: number, nickname: string): { checkIn: CheckIn; pointsResult?: ReturnType<typeof addPoints> } | { error: string } {
+  const meetup = db.meetups.find(m => m.id === meetupId)
+  if (!meetup) {
+    return { error: '读书会不存在' }
+  }
+  
+  const registration = db.registrations.find(r => r.meetupId === meetupId && r.nickname === nickname)
+  if (!registration) {
+    return { error: '您未报名本次活动' }
+  }
+  
+  if (registration.checkedIn) {
+    return { error: '您已完成签到' }
+  }
+  
+  const now = new Date().toISOString()
+  registration.checkedIn = true
+  registration.checkedInAt = now
+  
+  const checkIn: CheckIn = {
+    id: db.nextCheckInId++,
+    meetupId,
+    registrationId: registration.id,
+    nickname,
+    createdAt: now,
+  }
+  db.checkIns.push(checkIn)
+  
+  const pointsResult = addPoints(
+    nickname,
+    'meetup',
+    `参加《${meetup.title}》读书会`,
+    meetupId
+  )
+  
+  persistDB()
+  return { checkIn, pointsResult }
+}
+
+export function getCheckInsByMeetup(meetupId: number): CheckIn[] {
+  return db.checkIns
+    .filter(c => c.meetupId === meetupId)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+}
+
+export function getMeetupCheckInStats(meetupId: number): { totalRegistered: number; totalCheckedIn: number; checkInRate: number } {
+  const registrations = db.registrations.filter(r => r.meetupId === meetupId)
+  const checkedIn = registrations.filter(r => r.checkedIn)
+  const totalRegistered = registrations.length
+  const totalCheckedIn = checkedIn.length
+  const checkInRate = totalRegistered > 0 ? Math.round((totalCheckedIn / totalRegistered) * 100) : 0
+  return { totalRegistered, totalCheckedIn, checkInRate }
 }
 
 export function updateMeetupSummary(meetupId: number, data: { groupPhotos?: string[]; discussionNotes?: string }): Meetup | null {
