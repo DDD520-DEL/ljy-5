@@ -260,13 +260,14 @@ export const READER_LEVELS: Record<ReaderLevel, { name: string; minPoints: numbe
   bookcollector: { name: '藏书家', minPoints: 600, color: 'bg-purple-100 text-purple-700 border-purple-200' },
 }
 
-export type PointsActionType = 'borrow' | 'review' | 'meetup' | 'donation'
+export type PointsActionType = 'borrow' | 'review' | 'meetup' | 'donation' | 'exchange'
 
 export const POINTS_ACTION: Record<PointsActionType, { name: string; points: number }> = {
   borrow: { name: '借阅图书', points: 5 },
   review: { name: '发表书评', points: 10 },
   meetup: { name: '参加读书会', points: 15 },
   donation: { name: '捐赠图书', points: 20 },
+  exchange: { name: '图书交换', points: 10 },
 }
 
 export interface PointsAccount {
@@ -278,6 +279,7 @@ export interface PointsAccount {
   reviewCount: number
   meetupCount: number
   donationCount: number
+  exchangeCount: number
   createdAt: string
   updatedAt: string
 }
@@ -368,4 +370,82 @@ export interface ReaderProfile {
   donationReviews: DonationReview[]
   notes: Note[]
   unreadNotificationCount: number
+}
+
+export type BookCondition = '全新' | '九成新' | '八成新' | '七成新' | '一般'
+
+export type ExchangeListingStatus = 'active' | 'exchanged' | 'cancelled'
+
+export interface ExchangeListing {
+  id: number
+  bookId: number
+  owner: string
+  ownerContact?: string
+  bookTitle: string
+  bookAuthor: string
+  bookCover?: string
+  category: string
+  condition: BookCondition
+  wantCategories: string[]
+  wantBookNames: string[]
+  description?: string
+  status: ExchangeListingStatus
+  createdAt: string
+  updatedAt: string
+}
+
+export type ExchangeRequestStatus = 'pending' | 'accepted' | 'rejected' | 'completed'
+
+export interface ExchangeRequest {
+  id: number
+  listingId: number
+  requester: string
+  requesterContact?: string
+  offeredBookTitle: string
+  offeredBookAuthor: string
+  offeredBookCategory: string
+  offeredBookCondition: BookCondition
+  offeredBookCover?: string
+  message?: string
+  status: ExchangeRequestStatus
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateExchangeListingRequest {
+  bookId?: number
+  owner: string
+  ownerContact?: string
+  bookTitle: string
+  bookAuthor: string
+  bookCover?: string
+  category: string
+  condition: BookCondition
+  wantCategories: string[]
+  wantBookNames: string[]
+  description?: string
+}
+
+export interface CreateExchangeRequestRequest {
+  requester: string
+  requesterContact?: string
+  offeredBookTitle: string
+  offeredBookAuthor: string
+  offeredBookCategory: string
+  offeredBookCondition: BookCondition
+  offeredBookCover?: string
+  message?: string
+}
+
+export const BOOK_CONDITIONS: { value: BookCondition; label: string; color: string }[] = [
+  { value: '全新', label: '全新', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  { value: '九成新', label: '九成新', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { value: '八成新', label: '八成新', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  { value: '七成新', label: '七成新', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  { value: '一般', label: '一般', color: 'bg-gray-100 text-gray-700 border-gray-200' },
+]
+
+export interface ExchangeListingWithRequests extends ExchangeListing {
+  requests: ExchangeRequest[]
+  requestCount: number
 }

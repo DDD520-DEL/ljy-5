@@ -15,6 +15,7 @@ import traceRoutes from './routes/trace.js'
 import reservationsRoutes from './routes/reservations.js'
 import donationsRoutes from './routes/donations.js'
 import notesRoutes from './routes/notes.js'
+import exchangesRoutes from './routes/exchanges.js'
 
 // load env
 dotenv.config()
@@ -34,6 +35,7 @@ app.use('/api/trace', traceRoutes)
 app.use('/api/reservations', reservationsRoutes)
 app.use('/api/donations', donationsRoutes)
 app.use('/api/notes', notesRoutes)
+app.use('/api/exchanges', exchangesRoutes)
 
 /**
  * health

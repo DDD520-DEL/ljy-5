@@ -13,6 +13,10 @@ import MeetupCheckIn from "@/pages/MeetupCheckIn";
 import ReservationManage from "@/pages/ReservationManage";
 import ReaderProfile from "@/pages/ReaderProfile";
 import DonationReviewPage from "@/pages/DonationReview";
+import ExchangeMarket from "@/pages/ExchangeMarket";
+import ExchangeCreate from "@/pages/ExchangeCreate";
+import ExchangeDetail from "@/pages/ExchangeDetail";
+import ExchangeManage from "@/pages/ExchangeManage";
 
 export default function App() {
   return (
@@ -32,6 +36,10 @@ export default function App() {
           <Route path="/meetups/:id/checkin" element={<MeetupCheckIn />} />
           <Route path="/reservations" element={<ReservationManage />} />
           <Route path="/readers/:nickname" element={<ReaderProfile />} />
+          <Route path="/exchanges" element={<ExchangeMarket />} />
+          <Route path="/exchanges/new" element={<ExchangeCreate />} />
+          <Route path="/exchanges/:id" element={<ExchangeDetail />} />
+          <Route path="/exchanges/manage" element={<ExchangeManage />} />
         </Route>
       </Routes>
     </Router>

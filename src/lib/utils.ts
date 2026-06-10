@@ -114,6 +114,7 @@ export const pointsActionLabel: Record<PointsActionType, string> = {
   review: POINTS_ACTION.review.name,
   meetup: POINTS_ACTION.meetup.name,
   donation: POINTS_ACTION.donation.name,
+  exchange: POINTS_ACTION.exchange.name,
 }
 
 export const pointsActionPoints: Record<PointsActionType, number> = {
@@ -121,6 +122,7 @@ export const pointsActionPoints: Record<PointsActionType, number> = {
   review: POINTS_ACTION.review.points,
   meetup: POINTS_ACTION.meetup.points,
   donation: POINTS_ACTION.donation.points,
+  exchange: POINTS_ACTION.exchange.points,
 }
 
 export const pointsActionColor: Record<PointsActionType, string> = {
@@ -128,6 +130,7 @@ export const pointsActionColor: Record<PointsActionType, string> = {
   review: 'bg-emerald-100 text-emerald-700',
   meetup: 'bg-purple-100 text-purple-700',
   donation: 'bg-amber-100 text-amber-700',
+  exchange: 'bg-teal-100 text-teal-700',
 }
 
 export const donationReviewStatusLabel: Record<DonationReviewStatus, string> = {

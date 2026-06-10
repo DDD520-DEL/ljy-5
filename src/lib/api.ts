@@ -30,6 +30,11 @@ import type {
   BookBorrowStatus,
   BorrowRecord,
   Notification,
+  ExchangeListing,
+  ExchangeRequest,
+  CreateExchangeListingRequest,
+  CreateExchangeRequestRequest,
+  ExchangeListingWithRequests,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -259,5 +264,49 @@ export const noteApi = {
   delete: (id: number) =>
     request<{ success: boolean }>(`/notes/${id}`, {
       method: 'DELETE',
+    }),
+}
+
+export const exchangeApi = {
+  list: (params?: { category?: string; condition?: string; status?: string; search?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.category) qs.set('category', params.category)
+    if (params?.condition) qs.set('condition', params.condition)
+    if (params?.status) qs.set('status', params.status)
+    if (params?.search) qs.set('search', params.search)
+    const query = qs.toString()
+    return request<ExchangeListing[]>(`/exchanges${query ? `?${query}` : ''}`)
+  },
+  getByOwner: (nickname: string) =>
+    request<ExchangeListing[]>(`/exchanges/owner/${encodeURIComponent(nickname)}`),
+  getRequestsByRequester: (nickname: string) =>
+    request<ExchangeRequest[]>(`/exchanges/requests/by-requester/${encodeURIComponent(nickname)}`),
+  get: (id: number) =>
+    request<ExchangeListingWithRequests>(`/exchanges/${id}`),
+  create: (data: CreateExchangeListingRequest) =>
+    request<ExchangeListing>('/exchanges', { method: 'POST', body: JSON.stringify(data) }),
+  cancel: (id: number) =>
+    request<ExchangeListing>(`/exchanges/${id}/cancel`, { method: 'PUT' }),
+  createRequest: (listingId: number, data: CreateExchangeRequestRequest) =>
+    request<ExchangeRequest>(`/exchanges/${listingId}/request`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getRequests: (listingId: number) =>
+    request<ExchangeRequest[]>(`/exchanges/${listingId}/requests`),
+  acceptRequest: (requestId: number) =>
+    request<ExchangeRequest>(`/exchanges/requests/${requestId}/accept`, { method: 'POST' }),
+  rejectRequest: (requestId: number) =>
+    request<ExchangeRequest>(`/exchanges/requests/${requestId}/reject`, { method: 'POST' }),
+  completeRequest: (requestId: number, operator?: string) =>
+    request<{
+      request: ExchangeRequest
+      listing: ExchangeListing
+      ownerPointsResult: { account: PointsAccount; log: PointsLog; levelUp: boolean }
+      requesterPointsResult: { account: PointsAccount; log: PointsLog; levelUp: boolean }
+      newBook: Book
+    }>(`/exchanges/requests/${requestId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({ operator }),
     }),
 }

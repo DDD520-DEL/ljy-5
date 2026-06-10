@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -195,17 +195,17 @@ function calculateLevel(points: number): ReaderLevel {
 }
 
 const initialPointsAccounts: PointsAccount[] = [
-  { id: 1, nickname: '爱读书的猫', points: 25, level: 'bookworm', borrowCount: 1, reviewCount: 2, meetupCount: 0, donationCount: 0, createdAt: '2025-11-20T10:00:00.000Z', updatedAt: '2025-12-18T22:30:00.000Z' },
-  { id: 2, nickname: '夜读者', points: 15, level: 'bookworm', borrowCount: 1, reviewCount: 1, meetupCount: 0, donationCount: 0, createdAt: '2025-12-05T16:00:00.000Z', updatedAt: '2025-12-18T22:30:00.000Z' },
-  { id: 3, nickname: '书虫阿明', points: 10, level: 'bookworm', borrowCount: 0, reviewCount: 1, meetupCount: 0, donationCount: 0, createdAt: '2026-01-15T14:20:00.000Z', updatedAt: '2026-01-15T14:20:00.000Z' },
-  { id: 4, nickname: '不想长大', points: 15, level: 'bookworm', borrowCount: 1, reviewCount: 1, meetupCount: 0, donationCount: 0, createdAt: '2025-12-05T16:00:00.000Z', updatedAt: '2025-12-10T19:45:00.000Z' },
-  { id: 5, nickname: '小王子的玫瑰', points: 40, level: 'bookworm', borrowCount: 1, reviewCount: 1, meetupCount: 1, donationCount: 0, createdAt: '2025-12-05T16:00:00.000Z', updatedAt: '2026-01-02T21:00:00.000Z' },
-  { id: 6, nickname: '追风筝的人', points: 10, level: 'bookworm', borrowCount: 0, reviewCount: 1, meetupCount: 0, donationCount: 0, createdAt: '2025-11-02T18:30:00.000Z', updatedAt: '2025-11-02T18:30:00.000Z' },
-  { id: 7, nickname: '文字的力量', points: 10, level: 'bookworm', borrowCount: 0, reviewCount: 1, meetupCount: 0, donationCount: 0, createdAt: '2025-09-20T16:00:00.000Z', updatedAt: '2025-09-20T16:00:00.000Z' },
-  { id: 8, nickname: '平凡的人', points: 10, level: 'bookworm', borrowCount: 0, reviewCount: 1, meetupCount: 0, donationCount: 0, createdAt: '2025-10-08T20:15:00.000Z', updatedAt: '2025-10-08T20:15:00.000Z' },
-  { id: 9, nickname: '读书人小刘', points: 5, level: 'bookworm', borrowCount: 1, reviewCount: 0, meetupCount: 0, donationCount: 0, createdAt: '2026-01-10T09:00:00.000Z', updatedAt: '2026-01-10T09:00:00.000Z' },
-  { id: 10, nickname: '文学爱好者', points: 0, level: 'bookworm', borrowCount: 0, reviewCount: 0, meetupCount: 0, donationCount: 0, createdAt: '2026-01-13T15:30:00.000Z', updatedAt: '2026-01-13T15:30:00.000Z' },
-  { id: 11, nickname: '童话少女', points: 5, level: 'bookworm', borrowCount: 1, reviewCount: 0, meetupCount: 0, donationCount: 0, createdAt: '2025-12-05T16:00:00.000Z', updatedAt: '2025-12-05T16:00:00.000Z' },
+  { id: 1, nickname: '爱读书的猫', points: 25, level: 'bookworm', borrowCount: 1, reviewCount: 2, meetupCount: 0, donationCount: 0, exchangeCount: 0, createdAt: '2025-11-20T10:00:00.000Z', updatedAt: '2025-12-18T22:30:00.000Z' },
+  { id: 2, nickname: '夜读者', points: 15, level: 'bookworm', borrowCount: 1, reviewCount: 1, meetupCount: 0, donationCount: 0, exchangeCount: 0, createdAt: '2025-12-05T16:00:00.000Z', updatedAt: '2025-12-18T22:30:00.000Z' },
+  { id: 3, nickname: '书虫阿明', points: 10, level: 'bookworm', borrowCount: 0, reviewCount: 1, meetupCount: 0, donationCount: 0, exchangeCount: 0, createdAt: '2026-01-15T14:20:00.000Z', updatedAt: '2026-01-15T14:20:00.000Z' },
+  { id: 4, nickname: '不想长大', points: 15, level: 'bookworm', borrowCount: 1, reviewCount: 1, meetupCount: 0, donationCount: 0, exchangeCount: 0, createdAt: '2025-12-05T16:00:00.000Z', updatedAt: '2025-12-10T19:45:00.000Z' },
+  { id: 5, nickname: '小王子的玫瑰', points: 40, level: 'bookworm', borrowCount: 1, reviewCount: 1, meetupCount: 1, donationCount: 0, exchangeCount: 0, createdAt: '2025-12-05T16:00:00.000Z', updatedAt: '2026-01-02T21:00:00.000Z' },
+  { id: 6, nickname: '追风筝的人', points: 10, level: 'bookworm', borrowCount: 0, reviewCount: 1, meetupCount: 0, donationCount: 0, exchangeCount: 0, createdAt: '2025-11-02T18:30:00.000Z', updatedAt: '2025-11-02T18:30:00.000Z' },
+  { id: 7, nickname: '文字的力量', points: 10, level: 'bookworm', borrowCount: 0, reviewCount: 1, meetupCount: 0, donationCount: 0, exchangeCount: 0, createdAt: '2025-09-20T16:00:00.000Z', updatedAt: '2025-09-20T16:00:00.000Z' },
+  { id: 8, nickname: '平凡的人', points: 10, level: 'bookworm', borrowCount: 0, reviewCount: 1, meetupCount: 0, donationCount: 0, exchangeCount: 0, createdAt: '2025-10-08T20:15:00.000Z', updatedAt: '2025-10-08T20:15:00.000Z' },
+  { id: 9, nickname: '读书人小刘', points: 5, level: 'bookworm', borrowCount: 1, reviewCount: 0, meetupCount: 0, donationCount: 0, exchangeCount: 0, createdAt: '2026-01-10T09:00:00.000Z', updatedAt: '2026-01-10T09:00:00.000Z' },
+  { id: 10, nickname: '文学爱好者', points: 0, level: 'bookworm', borrowCount: 0, reviewCount: 0, meetupCount: 0, donationCount: 0, exchangeCount: 0, createdAt: '2026-01-13T15:30:00.000Z', updatedAt: '2026-01-13T15:30:00.000Z' },
+  { id: 11, nickname: '童话少女', points: 5, level: 'bookworm', borrowCount: 1, reviewCount: 0, meetupCount: 0, donationCount: 0, exchangeCount: 0, createdAt: '2025-12-05T16:00:00.000Z', updatedAt: '2025-12-05T16:00:00.000Z' },
 ]
 
 const initialPointsLogs: PointsLog[] = [
@@ -377,6 +377,8 @@ export interface Database {
   noteLikes: NoteLike[]
   borrowRecords: BorrowRecord[]
   notifications: Notification[]
+  exchangeListings: ExchangeListing[]
+  exchangeRequests: ExchangeRequest[]
   nextBookId: number
   nextTraceLogId: number
   nextReviewId: number
@@ -392,6 +394,8 @@ export interface Database {
   nextNoteLikeId: number
   nextBorrowRecordId: number
   nextNotificationId: number
+  nextExchangeListingId: number
+  nextExchangeRequestId: number
 }
 
 const initialCheckIns: CheckIn[] = [
@@ -405,6 +409,47 @@ const daysLater = (d: number) => new Date(today.getTime() + d * 86400000).toISOS
 const initialBorrowRecords: BorrowRecord[] = [
   { id: 1, bookId: 1, borrower: '夜读者', borrowDate: daysAgo(45), dueDate: daysAgo(15), status: 'overdue', reminderCount: 1, lastReminderAt: daysAgo(10), createdAt: daysAgo(45), updatedAt: daysAgo(10) },
   { id: 2, bookId: 2, borrower: '童话少女', borrowDate: daysAgo(10), dueDate: daysLater(20), status: 'borrowing', reminderCount: 0, createdAt: daysAgo(10), updatedAt: daysAgo(10) },
+]
+
+const initialExchangeListings: ExchangeListing[] = [
+  {
+    id: 1, bookId: 0, owner: '爱读书的猫', ownerContact: '13800138001',
+    bookTitle: '解忧杂货店', bookAuthor: '东野圭吾', category: '文学小说', condition: '九成新',
+    bookCover: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=japanese%20novel%20book%20cover%20warm%20light%20nostalgic%20shop%20evening&image_size=portrait_4_3',
+    wantCategories: ['历史社科', '哲学思想'], wantBookNames: ['人类简史'], description: '东野圭吾的非推理暖心之作，读完非常感动，想换社科类书籍',
+    status: 'active', createdAt: daysAgo(5), updatedAt: daysAgo(5),
+  },
+  {
+    id: 2, bookId: 0, owner: '追风筝的人', ownerContact: '13800138002',
+    bookTitle: '三体', bookAuthor: '刘慈欣', category: '科幻小说', condition: '八成新',
+    bookCover: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=three%20body%20problem%20scifi%20book%20cover%20space%20universe%20dark%20forest&image_size=portrait_4_3',
+    wantCategories: ['文学小说'], wantBookNames: ['百年孤独', '霍乱时期的爱情'], description: '科幻神作，想换拉美文学类图书',
+    status: 'active', createdAt: daysAgo(3), updatedAt: daysAgo(3),
+  },
+  {
+    id: 3, bookId: 0, owner: '小王子的玫瑰', ownerContact: '13900139001',
+    bookTitle: '小王子（法语原版）', bookAuthor: '安托万·德·圣-埃克苏佩里', category: '儿童文学', condition: '全新',
+    bookCover: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=little%20prince%20french%20edition%20book%20cover%20elegant%20minimalist&image_size=portrait_4_3',
+    wantCategories: ['艺术', '摄影'], wantBookNames: [], description: '法语原版小王子，全新未拆封，想换艺术或摄影类书籍',
+    status: 'active', createdAt: daysAgo(1), updatedAt: daysAgo(1),
+  },
+]
+
+const initialExchangeRequests: ExchangeRequest[] = [
+  {
+    id: 1, listingId: 1, requester: '夜读者', requesterContact: '13700137001',
+    offeredBookTitle: '枪炮、病菌与钢铁', offeredBookAuthor: '贾雷德·戴蒙德',
+    offeredBookCategory: '历史社科', offeredBookCondition: '九成新',
+    message: '这本社科经典你可能会喜欢，讲的是人类社会的命运',
+    status: 'pending', createdAt: daysAgo(2), updatedAt: daysAgo(2),
+  },
+  {
+    id: 2, listingId: 2, requester: '文字的力量', requesterContact: '13600136001',
+    offeredBookTitle: '百年孤独', offeredBookAuthor: '加西亚·马尔克斯',
+    offeredBookCategory: '文学小说', offeredBookCondition: '七成新',
+    message: '正好有百年孤独，品相一般但内容精彩',
+    status: 'pending', createdAt: daysAgo(1), updatedAt: daysAgo(1),
+  },
 ]
 
 const initialNotifications: Notification[] = [
@@ -429,6 +474,8 @@ const initialDB: Database = {
   noteLikes: initialNoteLikes,
   borrowRecords: initialBorrowRecords,
   notifications: initialNotifications,
+  exchangeListings: initialExchangeListings,
+  exchangeRequests: initialExchangeRequests,
   nextBookId: 6,
   nextTraceLogId: 9,
   nextReviewId: 9,
@@ -444,6 +491,8 @@ const initialDB: Database = {
   nextNoteLikeId: 13,
   nextBorrowRecordId: 3,
   nextNotificationId: 2,
+  nextExchangeListingId: 4,
+  nextExchangeRequestId: 3,
 }
 
 let db: Database = initialDB
@@ -486,6 +535,29 @@ function loadDB(): Database {
       }
       if (parsed.nextNotificationId === undefined) {
         parsed.nextNotificationId = (parsed.notifications?.length || 0) + 1
+      }
+      
+      if (!parsed.exchangeListings) {
+        parsed.exchangeListings = initialExchangeListings
+        parsed.exchangeRequests = initialExchangeRequests
+        parsed.nextExchangeListingId = 4
+        parsed.nextExchangeRequestId = 3
+        saveDB(parsed as Database)
+        console.log('[DB Migration] 初始化图书交换市场数据')
+      }
+      
+      if (parsed.pointsAccounts) {
+        let needMigrate = false
+        for (const acc of parsed.pointsAccounts) {
+          if (acc.exchangeCount === undefined) {
+            acc.exchangeCount = 0
+            needMigrate = true
+          }
+        }
+        if (needMigrate) {
+          saveDB(parsed as Database)
+          console.log('[DB Migration] 为积分账户添加 exchangeCount 字段')
+        }
       }
       
       console.log(`[DB] 已从 ${DATA_FILE} 加载数据`)
@@ -1095,6 +1167,7 @@ export function getOrCreatePointsAccount(nickname: string): PointsAccount {
       reviewCount: 0,
       meetupCount: 0,
       donationCount: 0,
+      exchangeCount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -1515,4 +1588,188 @@ export function deleteNote(id: number): boolean {
   persistDB()
   console.log(`[Note] 删除笔记: ID ${id}`)
   return true
+}
+
+export function createExchangeListing(data: CreateExchangeListingRequest): ExchangeListing {
+  const now = new Date().toISOString()
+  const listing: ExchangeListing = {
+    id: db.nextExchangeListingId++,
+    bookId: data.bookId || 0,
+    owner: data.owner,
+    ownerContact: data.ownerContact,
+    bookTitle: data.bookTitle,
+    bookAuthor: data.bookAuthor,
+    bookCover: data.bookCover,
+    category: data.category,
+    condition: data.condition,
+    wantCategories: data.wantCategories,
+    wantBookNames: data.wantBookNames,
+    description: data.description,
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+  }
+  db.exchangeListings.push(listing)
+  persistDB()
+  console.log(`[Exchange] 新交换挂单: 《${listing.bookTitle}》 by ${listing.owner}`)
+  return listing
+}
+
+export function getExchangeListings(filters?: { category?: string; condition?: string; status?: ExchangeListingStatus; search?: string }): ExchangeListing[] {
+  let listings = [...db.exchangeListings]
+  if (filters) {
+    if (filters.status) listings = listings.filter(l => l.status === filters.status)
+    if (filters.category) listings = listings.filter(l => l.category === filters.category)
+    if (filters.condition) listings = listings.filter(l => l.condition === filters.condition)
+    if (filters.search) {
+      const keyword = filters.search.toLowerCase()
+      listings = listings.filter(l =>
+        l.bookTitle.toLowerCase().includes(keyword) ||
+        l.bookAuthor.toLowerCase().includes(keyword) ||
+        l.owner.toLowerCase().includes(keyword) ||
+        l.wantBookNames.some(n => n.toLowerCase().includes(keyword)) ||
+        l.wantCategories.some(c => c.toLowerCase().includes(keyword))
+      )
+    }
+  }
+  return listings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+export function getExchangeListingById(id: number): ExchangeListing | null {
+  return db.exchangeListings.find(l => l.id === id) || null
+}
+
+export function cancelExchangeListing(id: number): ExchangeListing | null {
+  const listing = db.exchangeListings.find(l => l.id === id)
+  if (!listing || listing.status !== 'active') return null
+  listing.status = 'cancelled'
+  listing.updatedAt = new Date().toISOString()
+  db.exchangeRequests
+    .filter(r => r.listingId === id && r.status === 'pending')
+    .forEach(r => {
+      r.status = 'rejected'
+      r.updatedAt = new Date().toISOString()
+    })
+  persistDB()
+  console.log(`[Exchange] 取消挂单: 《${listing.bookTitle}》`)
+  return listing
+}
+
+export function createExchangeRequest(listingId: number, data: CreateExchangeRequestRequest): ExchangeRequest | { error: string } {
+  const listing = db.exchangeListings.find(l => l.id === listingId)
+  if (!listing || listing.status !== 'active') return { error: '交换挂单不存在或已下架' }
+  if (listing.owner === data.requester) return { error: '不能向自己发起交换请求' }
+  const existing = db.exchangeRequests.find(r => r.listingId === listingId && r.requester === data.requester && r.status === 'pending')
+  if (existing) return { error: '您已发起过交换请求，请等待回复' }
+  const now = new Date().toISOString()
+  const request: ExchangeRequest = {
+    id: db.nextExchangeRequestId++,
+    listingId,
+    requester: data.requester,
+    requesterContact: data.requesterContact,
+    offeredBookTitle: data.offeredBookTitle,
+    offeredBookAuthor: data.offeredBookAuthor,
+    offeredBookCategory: data.offeredBookCategory,
+    offeredBookCondition: data.offeredBookCondition,
+    offeredBookCover: data.offeredBookCover,
+    message: data.message,
+    status: 'pending',
+    createdAt: now,
+    updatedAt: now,
+  }
+  db.exchangeRequests.push(request)
+  persistDB()
+  console.log(`[Exchange] 新交换请求: ${data.requester} 想用《${data.offeredBookTitle}》换《${listing.bookTitle}》`)
+  return request
+}
+
+export function getExchangeRequestsByListing(listingId: number): ExchangeRequest[] {
+  return db.exchangeRequests
+    .filter(r => r.listingId === listingId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+export function getExchangeRequestsByRequester(requester: string): ExchangeRequest[] {
+  return db.exchangeRequests
+    .filter(r => r.requester === requester)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+export function getExchangeRequestById(id: number): ExchangeRequest | null {
+  return db.exchangeRequests.find(r => r.id === id) || null
+}
+
+export function acceptExchangeRequest(requestId: number): ExchangeRequest | { error: string } {
+  const request = db.exchangeRequests.find(r => r.id === requestId)
+  if (!request || request.status !== 'pending') return { error: '请求不存在或已处理' }
+  const listing = db.exchangeListings.find(l => l.id === request.listingId)
+  if (!listing || listing.status !== 'active') return { error: '挂单不存在或已下架' }
+  request.status = 'accepted'
+  request.updatedAt = new Date().toISOString()
+  db.exchangeRequests
+    .filter(r => r.listingId === request.listingId && r.id !== requestId && r.status === 'pending')
+    .forEach(r => {
+      r.status = 'rejected'
+      r.updatedAt = new Date().toISOString()
+    })
+  persistDB()
+  console.log(`[Exchange] 接受交换请求: ${request.requester} <-> ${listing.owner}`)
+  return request
+}
+
+export function rejectExchangeRequest(requestId: number): ExchangeRequest | { error: string } {
+  const request = db.exchangeRequests.find(r => r.id === requestId)
+  if (!request || request.status !== 'pending') return { error: '请求不存在或已处理' }
+  request.status = 'rejected'
+  request.updatedAt = new Date().toISOString()
+  persistDB()
+  console.log(`[Exchange] 拒绝交换请求: ID ${requestId}`)
+  return request
+}
+
+export function completeExchange(requestId: number, operator?: string): { request: ExchangeRequest; listing: ExchangeListing; ownerPointsResult: ReturnType<typeof addPoints>; requesterPointsResult: ReturnType<typeof addPoints>; newBook: Book } | { error: string } {
+  const request = db.exchangeRequests.find(r => r.id === requestId)
+  if (!request || request.status !== 'accepted') return { error: '请求不存在或未被接受' }
+  const listing = db.exchangeListings.find(l => l.id === request.listingId)
+  if (!listing) return { error: '挂单不存在' }
+
+  const now = new Date().toISOString()
+
+  if (listing.bookId > 0) {
+    addTraceLog(listing.bookId, '转让', `《${listing.bookTitle}》由${listing.owner}转让给${request.requester}，管理员${operator || '管理员'}确认`, operator || '管理员')
+  }
+
+  const newBook: Book = {
+    id: db.nextBookId++,
+    traceId: randomTraceId(),
+    title: request.offeredBookTitle,
+    author: request.offeredBookAuthor,
+    category: request.offeredBookCategory,
+    sourceType: 'secondhand',
+    sourceInfo: `图书交换：${request.requester}以《${request.offeredBookTitle}》交换${listing.owner}的《${listing.bookTitle}》`,
+    coverImage: request.offeredBookCover,
+    createdAt: now,
+    borrowCount: 0,
+    discussCount: 0,
+  }
+  db.books.push(newBook)
+  addTraceLog(newBook.id, '入库', `通过图书交换入库，源自${request.requester}的《${request.offeredBookTitle}》`, operator || '管理员')
+
+  request.status = 'completed'
+  request.updatedAt = now
+  listing.status = 'exchanged'
+  listing.updatedAt = now
+
+  const ownerPointsResult = addPoints(listing.owner, 'exchange', `图书交换：出让《${listing.bookTitle}》`, listing.id)
+  const requesterPointsResult = addPoints(request.requester, 'exchange', `图书交换：获得《${listing.bookTitle}》`, listing.id)
+
+  persistDB()
+  console.log(`[Exchange] 交换完成: ${listing.owner}《${listing.bookTitle}》 <-> ${request.requester}《${request.offeredBookTitle}》`)
+  return { request, listing, ownerPointsResult, requesterPointsResult, newBook }
+}
+
+export function getExchangeListingsByOwner(owner: string): ExchangeListing[] {
+  return db.exchangeListings
+    .filter(l => l.owner === owner)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 }
