@@ -1,0 +1,146 @@
+import express from 'express'
+import QRCode from 'qrcode'
+import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount } from '../db'
+import type { CreateBookRequest, CreateReviewRequest } from '../../shared/types'
+
+const router = express.Router()
+
+router.get('/', (req, res) => {
+  const db = getDB()
+  const { source, category, search, _sort, _order } = req.query
+  
+  let books = [...db.books]
+  
+  if (source && typeof source === 'string') {
+    books = books.filter(b => b.sourceType === source)
+  }
+  if (category && typeof category === 'string') {
+    books = books.filter(b => b.category === category)
+  }
+  if (search && typeof search === 'string') {
+    const keyword = search.toLowerCase()
+    books = books.filter(b => 
+      b.title.toLowerCase().includes(keyword) ||
+      b.author.toLowerCase().includes(keyword) ||
+      b.traceId.toLowerCase().includes(keyword)
+    )
+  }
+  
+  if (_sort && typeof _sort === 'string' && _order && typeof _order === 'string') {
+    books.sort((a, b) => {
+      const aVal = a[_sort as keyof typeof a] as number
+      const bVal = b[_sort as keyof typeof b] as number
+      return _order === 'asc' ? aVal - bVal : bVal - aVal
+    })
+  }
+  
+  res.json(books)
+})
+
+router.get('/ranking', (req, res) => {
+  const db = getDB()
+  const { type = 'borrow' } = req.query
+  const sortKey = type === 'discuss' ? 'discussCount' : 'borrowCount'
+  const books = [...db.books]
+    .sort((a, b) => (b[sortKey] as number) - (a[sortKey] as number))
+    .slice(0, 10)
+  res.json(books)
+})
+
+router.get('/:id', (req, res) => {
+  const db = getDB()
+  const id = parseInt(req.params.id)
+  const book = db.books.find(b => b.id === id)
+  if (!book) {
+    res.status(404).json({ error: '图书不存在' })
+    return
+  }
+  res.json(book)
+})
+
+router.get('/:id/trace', (req, res) => {
+  const db = getDB()
+  const id = parseInt(req.params.id)
+  const logs = db.traceLogs
+    .filter(l => l.bookId === id)
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  res.json(logs)
+})
+
+router.get('/:id/reviews', (req, res) => {
+  const db = getDB()
+  const id = parseInt(req.params.id)
+  const reviews = db.reviews
+    .filter(r => r.bookId === id)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  res.json(reviews)
+})
+
+router.post('/', (req, res) => {
+  const body = req.body as CreateBookRequest
+  if (!body.title || !body.author || !body.category || !body.sourceType) {
+    res.status(400).json({ error: '必填字段缺失' })
+    return
+  }
+  const book = addBook(body)
+  res.status(201).json(book)
+})
+
+router.post('/:id/reviews', (req, res) => {
+  const db = getDB()
+  const id = parseInt(req.params.id)
+  const book = db.books.find(b => b.id === id)
+  if (!book) {
+    res.status(404).json({ error: '图书不存在' })
+    return
+  }
+  const body = req.body as CreateReviewRequest
+  if (!body.content || !body.nickname || !body.rating) {
+    res.status(400).json({ error: '必填字段缺失' })
+    return
+  }
+  const review = addReview(id, body)
+  res.status(201).json(review)
+})
+
+router.get('/:id/qrcode', async (req, res) => {
+  const db = getDB()
+  const id = parseInt(req.params.id)
+  const book = db.books.find(b => b.id === id)
+  if (!book) {
+    res.status(404).json({ error: '图书不存在' })
+    return
+  }
+  
+  const traceUrl = `${req.protocol}://${req.get('host')}/trace/${book.traceId}`
+  
+  try {
+    const dataUrl = await QRCode.toDataURL(traceUrl, {
+      width: 256,
+      margin: 2,
+      color: {
+        dark: '#6F4E37',
+        light: '#FFFFFF'
+      }
+    })
+    res.json({ qrcode: dataUrl, traceId: book.traceId, traceUrl })
+  } catch (err) {
+    res.status(500).json({ error: '二维码生成失败' })
+  }
+})
+
+router.post('/:id/borrow', (req, res) => {
+  const db = getDB()
+  const id = parseInt(req.params.id)
+  const book = db.books.find(b => b.id === id)
+  if (!book) {
+    res.status(404).json({ error: '图书不存在' })
+    return
+  }
+  incrementBorrowCount(id)
+  const { operator } = req.body as { operator?: string }
+  addTraceLog(id, '借出', `读者借阅，书店${operator || '管理员'}登记`, operator || '管理员')
+  res.json({ success: true, borrowCount: book.borrowCount })
+})
+
+export default router
