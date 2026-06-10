@@ -1,5 +1,5 @@
 import express from 'express'
-import { getDB, addMeetup, registerMeetup, updateMeetupSummary } from '../db'
+import { getDB, addMeetup, registerMeetup, updateMeetupSummary, getPointsAccount } from '../db'
 import type { CreateMeetupRequest, RegisterMeetupRequest, UpdateMeetupSummaryRequest } from '../../shared/types'
 
 const router = express.Router()
@@ -26,7 +26,10 @@ router.get('/:id', (req, res) => {
     return
   }
   
-  const registrations = db.registrations.filter(r => r.meetupId === id)
+  const registrations = db.registrations.filter(r => r.meetupId === id).map(r => {
+    const account = getPointsAccount(r.nickname)
+    return { ...r, level: account?.level || null }
+  })
   res.json({ ...meetup, registrations })
 })
 
@@ -55,13 +58,16 @@ router.post('/:id/register', (req, res) => {
     return
   }
   
-  const registration = registerMeetup(id, body)
-  if (!registration) {
+  const result = registerMeetup(id, body)
+  if (!result) {
     res.status(400).json({ error: '报名人数已满' })
     return
   }
   
-  res.status(201).json(registration)
+  res.status(201).json({ 
+    registration: result.registration, 
+    pointsResult: result.pointsResult 
+  })
 })
 
 router.put('/:id/summary', (req, res) => {

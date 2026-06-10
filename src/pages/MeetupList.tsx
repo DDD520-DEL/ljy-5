@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Calendar, MapPin, Users, Plus, Filter, CalendarDays } from 'lucide-react'
 import { meetupApi } from '@/lib/api'
@@ -12,11 +12,7 @@ export default function MeetupList() {
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
 
-  useEffect(() => {
-    loadMeetups()
-  }, [filterStatus])
-
-  async function loadMeetups() {
+  const loadMeetups = useCallback(async () => {
     try {
       setLoading(true)
       const data = await meetupApi.list(filterStatus === 'all' ? undefined : filterStatus)
@@ -26,7 +22,11 @@ export default function MeetupList() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filterStatus])
+
+  useEffect(() => {
+    loadMeetups()
+  }, [filterStatus, loadMeetups])
 
   const filterOptions: { value: FilterStatus; label: string }[] = [
     { value: 'all', label: '全部' },

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus } from 'lucide-react'
+import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus, Star, User } from 'lucide-react'
 import { bookApi, meetupApi, reservationApi } from '@/lib/api'
-import { formatDate, sourceTypeLabel, sourceTypeColor, meetupStatusLabel, meetupStatusColor, cn } from '@/lib/utils'
-import type { Book as BookType, Meetup } from '../../shared/types'
+import { formatDate, sourceTypeLabel, sourceTypeColor, meetupStatusLabel, meetupStatusColor, readerLevelLabel, readerLevelColor, cn } from '@/lib/utils'
+import type { Book as BookType, Meetup, ReaderRanking } from '../../shared/types'
 
 export default function Dashboard() {
   const [books, setBooks] = useState<BookType[]>([])
@@ -13,6 +13,8 @@ export default function Dashboard() {
   const [reservationCount, setReservationCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [rankType, setRankType] = useState<'borrow' | 'discuss'>('borrow')
+  const [pointsRanking, setPointsRanking] = useState<ReaderRanking[]>([])
+  const [borrowCountRanking, setBorrowCountRanking] = useState<ReaderRanking[]>([])
 
   useEffect(() => {
     loadData()
@@ -20,18 +22,22 @@ export default function Dashboard() {
 
   async function loadData() {
     try {
-      const [allBooks, borrowRank, discussRank, allMeetups, resStats] = await Promise.all([
+      const [allBooks, borrowRank, discussRank, allMeetups, resStats, pointsRank, borrowCountRank] = await Promise.all([
         bookApi.list(),
         bookApi.ranking('borrow'),
         bookApi.ranking('discuss'),
         meetupApi.list(),
         reservationApi.stats(),
+        bookApi.readerRanking('points', 8),
+        bookApi.readerRanking('borrow', 8),
       ])
       setBooks(allBooks)
       setBorrowRanking(borrowRank)
       setDiscussRanking(discussRank)
       setMeetups(allMeetups.slice(0, 5))
       setReservationCount(resStats.count)
+      setPointsRanking(pointsRank)
+      setBorrowCountRanking(borrowCountRank)
     } catch (err) {
       console.error(err)
     } finally {
@@ -75,6 +81,13 @@ export default function Dashboard() {
       gradient: 'from-sky-500 to-sky-700',
       bg: 'bg-sky-50',
     },
+    {
+      label: '注册读者',
+      value: pointsRanking.length + borrowCountRanking.length > 0 ? new Set([...pointsRanking, ...borrowCountRanking].map(r => r.nickname)).size : 0,
+      icon: User,
+      gradient: 'from-purple-500 to-purple-700',
+      bg: 'bg-purple-50',
+    },
   ]
 
   const ranking = rankType === 'borrow' ? borrowRanking : discussRanking
@@ -102,7 +115,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {stats.map((stat) => (
           <div
             key={stat.label}
@@ -222,6 +235,106 @@ export default function Dashboard() {
             查看全部活动
             <ChevronRight className="w-4 h-4" />
           </Link>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="card p-6">
+          <div className="flex items-center gap-2 mb-5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
+              <Star className="w-4 h-4 text-white" />
+            </div>
+            <h2 className="section-title">积分排行榜</h2>
+          </div>
+          <div className="space-y-2">
+            {pointsRanking.slice(0, 8).map((reader, idx) => (
+              <Link
+                key={reader.nickname}
+                to={`/readers/${encodeURIComponent(reader.nickname)}`}
+                className="flex items-center gap-3 p-3 rounded-xl hover:bg-coffee-50 transition-colors group"
+              >
+                <span className={cn(
+                  'w-7 h-7 rounded-lg flex items-center justify-center font-serif font-bold text-xs flex-shrink-0',
+                  idx === 0 ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-white' :
+                  idx === 1 ? 'bg-gradient-to-br from-coffee-300 to-coffee-500 text-white' :
+                  idx === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-800 text-white' :
+                  'bg-coffee-100 text-coffee-500'
+                )}>
+                  {idx + 1}
+                </span>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-coffee-400 to-coffee-600 flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-xs font-medium">{reader.nickname.charAt(0)}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-medium text-coffee-900 truncate group-hover:text-coffee-700 text-sm">{reader.nickname}</p>
+                    <span className={cn('badge border text-[10px] py-0 px-1.5', readerLevelColor[reader.level])}>
+                      {readerLevelLabel[reader.level]}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right flex items-center gap-2">
+                  <div>
+                    <p className="font-bold text-coffee-800 text-sm">{reader.points}</p>
+                    <p className="text-[10px] text-coffee-400">积分</p>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-coffee-300 group-hover:text-coffee-500 transition-colors" />
+                </div>
+              </Link>
+            ))}
+            {pointsRanking.length === 0 && (
+              <p className="text-center text-coffee-400 py-8 text-sm">暂无数据</p>
+            )}
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <div className="flex items-center gap-2 mb-5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center">
+              <Book className="w-4 h-4 text-white" />
+            </div>
+            <h2 className="section-title">借阅量排行榜</h2>
+          </div>
+          <div className="space-y-2">
+            {borrowCountRanking.slice(0, 8).map((reader, idx) => (
+              <Link
+                key={reader.nickname}
+                to={`/readers/${encodeURIComponent(reader.nickname)}`}
+                className="flex items-center gap-3 p-3 rounded-xl hover:bg-coffee-50 transition-colors group"
+              >
+                <span className={cn(
+                  'w-7 h-7 rounded-lg flex items-center justify-center font-serif font-bold text-xs flex-shrink-0',
+                  idx === 0 ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-white' :
+                  idx === 1 ? 'bg-gradient-to-br from-coffee-300 to-coffee-500 text-white' :
+                  idx === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-800 text-white' :
+                  'bg-coffee-100 text-coffee-500'
+                )}>
+                  {idx + 1}
+                </span>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-coffee-400 to-coffee-600 flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-xs font-medium">{reader.nickname.charAt(0)}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-medium text-coffee-900 truncate group-hover:text-coffee-700 text-sm">{reader.nickname}</p>
+                    <span className={cn('badge border text-[10px] py-0 px-1.5', readerLevelColor[reader.level])}>
+                      {readerLevelLabel[reader.level]}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right flex items-center gap-2">
+                  <div>
+                    <p className="font-bold text-coffee-800 text-sm">{reader.borrowCount}</p>
+                    <p className="text-[10px] text-coffee-400">次借阅</p>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-coffee-300 group-hover:text-coffee-500 transition-colors" />
+                </div>
+              </Link>
+            ))}
+            {borrowCountRanking.length === 0 && (
+              <p className="text-center text-coffee-400 py-8 text-sm">暂无数据</p>
+            )}
+          </div>
         </div>
       </div>
 

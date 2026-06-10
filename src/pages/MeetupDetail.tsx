@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   Calendar,
@@ -19,11 +19,12 @@ import { meetupApi, bookApi } from '@/lib/api'
 import {
   meetupStatusLabel,
   meetupStatusColor,
-  formatDate,
+  readerLevelLabel,
+  readerLevelColor,
   formatDateTime,
   cn,
 } from '@/lib/utils'
-import type { Meetup, Registration, Book as BookType } from '../../shared/types'
+import type { Meetup, Registration, Book as BookType, ReaderLevel } from '../../shared/types'
 
 export default function MeetupDetail() {
   const { id } = useParams<{ id: string }>()
@@ -46,12 +47,7 @@ export default function MeetupDetail() {
 
   const isAdmin = true
 
-  useEffect(() => {
-    if (!id) return
-    loadData()
-  }, [id])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -78,7 +74,12 @@ export default function MeetupDetail() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    if (!id) return
+    loadData()
+  }, [id, loadData])
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
@@ -489,9 +490,10 @@ export default function MeetupDetail() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {meetup.registrations.map((reg) => (
-              <div
+              <Link
                 key={reg.id}
-                className="flex items-center gap-2 p-3 rounded-lg bg-coffee-50/50 border border-coffee-100"
+                to={`/readers/${encodeURIComponent(reg.nickname)}`}
+                className="flex items-center gap-2 p-3 rounded-lg bg-coffee-50/50 border border-coffee-100 hover:bg-coffee-50 hover:border-coffee-200 transition-colors group"
               >
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-coffee-400 to-coffee-600 flex items-center justify-center flex-shrink-0">
                   <span className="text-white text-sm font-medium">
@@ -499,14 +501,16 @@ export default function MeetupDetail() {
                   </span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-coffee-800 truncate">
+                  <p className="text-sm font-medium text-coffee-800 truncate group-hover:text-coffee-600">
                     {reg.nickname}
                   </p>
-                  <p className="text-xs text-coffee-400">
-                    {formatDate(reg.createdAt)}
-                  </p>
+                  {(reg as Registration & { level?: ReaderLevel }).level && (
+                    <span className={cn('badge border text-[10px] py-0 px-1', readerLevelColor[(reg as Registration & { level?: ReaderLevel }).level as ReaderLevel])}>
+                      {readerLevelLabel[(reg as Registration & { level?: ReaderLevel }).level as ReaderLevel]}
+                    </span>
+                  )}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

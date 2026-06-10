@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { SourceType, MeetupStatus } from '../../shared/types'
+import type { SourceType, MeetupStatus, ReaderLevel, PointsActionType } from '../../shared/types'
+import { READER_LEVELS, POINTS_ACTION } from '../../shared/types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -58,4 +59,88 @@ export const meetupStatusColor: Record<MeetupStatus, string> = {
 
 export function renderStars(rating: number): string {
   return '★'.repeat(rating) + '☆'.repeat(5 - rating)
+}
+
+export const readerLevelLabel: Record<ReaderLevel, string> = {
+  bookworm: READER_LEVELS.bookworm.name,
+  booklover: READER_LEVELS.booklover.name,
+  bookmaniac: READER_LEVELS.bookmaniac.name,
+  bookcollector: READER_LEVELS.bookcollector.name,
+}
+
+export const readerLevelColor: Record<ReaderLevel, string> = {
+  bookworm: READER_LEVELS.bookworm.color,
+  booklover: READER_LEVELS.booklover.color,
+  bookmaniac: READER_LEVELS.bookmaniac.color,
+  bookcollector: READER_LEVELS.bookcollector.color,
+}
+
+export const readerLevelMinPoints: Record<ReaderLevel, number> = {
+  bookworm: READER_LEVELS.bookworm.minPoints,
+  booklover: READER_LEVELS.booklover.minPoints,
+  bookmaniac: READER_LEVELS.bookmaniac.minPoints,
+  bookcollector: READER_LEVELS.bookcollector.minPoints,
+}
+
+export const pointsActionLabel: Record<PointsActionType, string> = {
+  borrow: POINTS_ACTION.borrow.name,
+  review: POINTS_ACTION.review.name,
+  meetup: POINTS_ACTION.meetup.name,
+  donation: POINTS_ACTION.donation.name,
+}
+
+export const pointsActionPoints: Record<PointsActionType, number> = {
+  borrow: POINTS_ACTION.borrow.points,
+  review: POINTS_ACTION.review.points,
+  meetup: POINTS_ACTION.meetup.points,
+  donation: POINTS_ACTION.donation.points,
+}
+
+export const pointsActionColor: Record<PointsActionType, string> = {
+  borrow: 'bg-sky-100 text-sky-700',
+  review: 'bg-emerald-100 text-emerald-700',
+  meetup: 'bg-purple-100 text-purple-700',
+  donation: 'bg-amber-100 text-amber-700',
+}
+
+export function getNextLevel(points: number): { level: ReaderLevel; minPoints: number } | null {
+  const levels = Object.entries(READER_LEVELS) as [ReaderLevel, typeof READER_LEVELS[ReaderLevel]][]
+  levels.sort((a, b) => a[1].minPoints - b[1].minPoints)
+  for (const [level, config] of levels) {
+    if (points < config.minPoints) {
+      return { level, minPoints: config.minPoints }
+    }
+  }
+  return null
+}
+
+export function getLevelProgress(points: number): { currentLevel: ReaderLevel; nextLevel: ReaderLevel | null; progress: number; minPoints: number; maxPoints: number } {
+  const levels = Object.entries(READER_LEVELS) as [ReaderLevel, typeof READER_LEVELS[ReaderLevel]][]
+  levels.sort((a, b) => a[1].minPoints - b[1].minPoints)
+
+  let currentLevel: ReaderLevel = 'bookworm'
+  let currentLevelMin = 0
+  let nextLevel: ReaderLevel | null = null
+  let nextLevelMin = 0
+
+  for (let i = 0; i < levels.length; i++) {
+    const [level, config] = levels[i]
+    if (points >= config.minPoints) {
+      currentLevel = level
+      currentLevelMin = config.minPoints
+      if (i < levels.length - 1) {
+        nextLevel = levels[i + 1][0]
+        nextLevelMin = levels[i + 1][1].minPoints
+      } else {
+        nextLevel = null
+      }
+    }
+  }
+
+  if (!nextLevel) {
+    return { currentLevel, nextLevel: null, progress: 100, minPoints: currentLevelMin, maxPoints: currentLevelMin }
+  }
+
+  const progress = ((points - currentLevelMin) / (nextLevelMin - currentLevelMin)) * 100
+  return { currentLevel, nextLevel, progress: Math.min(progress, 100), minPoints: currentLevelMin, maxPoints: nextLevelMin }
 }

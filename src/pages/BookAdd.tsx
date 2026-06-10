@@ -60,11 +60,11 @@ export default function BookAdd() {
 
     setSubmitting(true)
     try {
-      const createdBook = await bookApi.create(form)
-      const qrData = await bookApi.qrcode(createdBook.id)
+      const result = await bookApi.create(form)
+      const qrData = await bookApi.qrcode(result.book.id)
       setSuccess({
-        bookId: createdBook.id,
-        traceId: createdBook.traceId,
+        bookId: result.book.id,
+        traceId: result.book.traceId,
         qrcode: qrData.qrcode,
         traceUrl: qrData.traceUrl,
       })

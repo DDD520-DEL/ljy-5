@@ -11,6 +11,10 @@ import type {
   RegisterMeetupRequest,
   CreateReservationRequest,
   UpdateMeetupSummaryRequest,
+  ReaderRanking,
+  ReaderProfile,
+  PointsAccount,
+  PointsLog,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -45,16 +49,16 @@ export const bookApi = {
   trace: (id: number) => request<TraceLog[]>(`/books/${id}/trace`),
   reviews: (id: number) => request<Review[]>(`/books/${id}/reviews`),
   create: (data: CreateBookRequest) =>
-    request<Book>('/books', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ book: Book; pointsResult?: { account: PointsAccount; log: PointsLog; levelUp: boolean } }>('/books', { method: 'POST', body: JSON.stringify(data) }),
   addReview: (id: number, data: CreateReviewRequest) =>
-    request<Review>(`/books/${id}/reviews`, {
+    request<{ review: Review; pointsResult?: { account: PointsAccount; log: PointsLog; levelUp: boolean } }>(`/books/${id}/reviews`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   qrcode: (id: number) =>
     request<{ qrcode: string; traceId: string; traceUrl: string }>(`/books/${id}/qrcode`),
   borrow: (id: number, data?: { operator?: string; borrower?: string }) =>
-    request<{ success: boolean; borrowCount: number; fulfilledReservation: Reservation | null }>(`/books/${id}/borrow`, {
+    request<{ success: boolean; borrowCount: number; fulfilledReservation: Reservation | null; pointsResult?: { account: PointsAccount; log: PointsLog; levelUp: boolean } }>(`/books/${id}/borrow`, {
       method: 'POST',
       body: JSON.stringify(data || {}),
     }),
@@ -69,6 +73,10 @@ export const bookApi = {
     }),
   status: (id: number) =>
     request<{ borrowed: boolean; reservationCount: number }>(`/books/${id}/status`),
+  readerRanking: (type: 'points' | 'borrow' = 'points', limit: number = 10) =>
+    request<ReaderRanking[]>(`/books/readers/ranking?type=${type}&limit=${limit}`),
+  readerProfile: (nickname: string) =>
+    request<ReaderProfile>(`/books/readers/${encodeURIComponent(nickname)}`),
 }
 
 export const traceApi = {

@@ -10,6 +10,7 @@ import MeetupList from "@/pages/MeetupList";
 import MeetupCreate from "@/pages/MeetupCreate";
 import MeetupDetail from "@/pages/MeetupDetail";
 import ReservationManage from "@/pages/ReservationManage";
+import ReaderProfile from "@/pages/ReaderProfile";
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/meetups/new" element={<MeetupCreate />} />
           <Route path="/meetups/:id" element={<MeetupDetail />} />
           <Route path="/reservations" element={<ReservationManage />} />
+          <Route path="/readers/:nickname" element={<ReaderProfile />} />
         </Route>
       </Routes>
     </Router>

@@ -10,6 +10,7 @@ const router = Router()
  * User Login
  * POST /api/auth/register
  */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 router.post('/register', async (req: Request, res: Response): Promise<void> => {
   // TODO: Implement register logic
 })
@@ -29,5 +30,6 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 router.post('/logout', async (req: Request, res: Response): Promise<void> => {
   // TODO: Implement logout logic
 })
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 export default router

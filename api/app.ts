@@ -8,17 +8,11 @@ import express, {
   type NextFunction,
 } from 'express'
 import cors from 'cors'
-import path from 'path'
 import dotenv from 'dotenv'
-import { fileURLToPath } from 'url'
 import booksRoutes from './routes/books.js'
 import meetupsRoutes from './routes/meetups.js'
 import traceRoutes from './routes/trace.js'
 import reservationsRoutes from './routes/reservations.js'
-
-// for esm mode
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
 
 // load env
 dotenv.config()
@@ -42,6 +36,7 @@ app.use('/api/reservations', reservationsRoutes)
  */
 app.use(
   '/api/health',
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   (req: Request, res: Response, next: NextFunction): void => {
     res.status(200).json({
       success: true,
@@ -53,6 +48,7 @@ app.use(
 /**
  * error handler middleware
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
   res.status(500).json({
     success: false,

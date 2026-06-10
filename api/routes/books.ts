@@ -1,7 +1,7 @@
 import express from 'express'
 import QRCode from 'qrcode'
-import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower } from '../db'
-import type { CreateBookRequest, CreateReviewRequest } from '../../shared/types'
+import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower, getReviewsWithLevel, addPoints, getPointsRanking, getBorrowRanking, getReaderProfile } from '../db'
+import type { CreateBookRequest, CreateReviewRequest, ReaderRanking } from '../../shared/types'
 
 const router = express.Router()
 
@@ -47,6 +47,28 @@ router.get('/ranking', (req, res) => {
   res.json(books)
 })
 
+router.get('/readers/ranking', (req, res) => {
+  const { type = 'points', limit = '10' } = req.query
+  const limitNum = parseInt(limit as string) || 10
+  let ranking: ReaderRanking[]
+  if (type === 'borrow') {
+    ranking = getBorrowRanking(limitNum)
+  } else {
+    ranking = getPointsRanking(limitNum)
+  }
+  res.json(ranking)
+})
+
+router.get('/readers/:nickname', (req, res) => {
+  const { nickname } = req.params
+  const profile = getReaderProfile(decodeURIComponent(nickname))
+  if (!profile) {
+    res.status(404).json({ error: '读者不存在' })
+    return
+  }
+  res.json(profile)
+})
+
 router.get('/:id', (req, res) => {
   const db = getDB()
   const id = parseInt(req.params.id)
@@ -68,11 +90,8 @@ router.get('/:id/trace', (req, res) => {
 })
 
 router.get('/:id/reviews', (req, res) => {
-  const db = getDB()
   const id = parseInt(req.params.id)
-  const reviews = db.reviews
-    .filter(r => r.bookId === id)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const reviews = getReviewsWithLevel(id)
   res.json(reviews)
 })
 
@@ -82,8 +101,11 @@ router.post('/', (req, res) => {
     res.status(400).json({ error: '必填字段缺失' })
     return
   }
-  const book = addBook(body)
-  res.status(201).json(book)
+  const result = addBook(body)
+  res.status(201).json({ 
+    book: result.book, 
+    pointsResult: result.pointsResult 
+  })
 })
 
 router.post('/:id/reviews', (req, res) => {
@@ -99,8 +121,11 @@ router.post('/:id/reviews', (req, res) => {
     res.status(400).json({ error: '必填字段缺失' })
     return
   }
-  const review = addReview(id, body)
-  res.status(201).json(review)
+  const result = addReview(id, body)
+  res.status(201).json({ 
+    review: result.review, 
+    pointsResult: result.pointsResult 
+  })
 })
 
 router.get('/:id/qrcode', async (req, res) => {
@@ -127,6 +152,7 @@ router.get('/:id/qrcode', async (req, res) => {
     })
     res.json({ qrcode: dataUrl, traceId: book.traceId, traceUrl })
   } catch (err) {
+    console.error('QR code generation failed:', err)
     res.status(500).json({ error: '二维码生成失败' })
   }
 })
@@ -152,7 +178,22 @@ router.post('/:id/borrow', (req, res) => {
     fulfilledReservation = fulfillReservationByBorrower(id, borrower)
   }
 
-  res.json({ success: true, borrowCount: book.borrowCount, fulfilledReservation })
+  let pointsResult = null
+  if (borrower) {
+    pointsResult = addPoints(
+      borrower,
+      'borrow',
+      `借阅《${book.title}》`,
+      id
+    )
+  }
+
+  res.json({ 
+    success: true, 
+    borrowCount: book.borrowCount, 
+    fulfilledReservation,
+    pointsResult 
+  })
 })
 
 router.post('/:id/return', (req, res) => {

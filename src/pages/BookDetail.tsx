@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   Calendar,
   User,
@@ -28,9 +28,11 @@ import {
   sourceTypeLabel,
   sourceTypeColor,
   renderStars,
+  readerLevelLabel,
+  readerLevelColor,
   cn,
 } from '@/lib/utils'
-import type { Book as BookType, TraceLog, Review, Reservation } from '../../shared/types'
+import type { Book as BookType, TraceLog, Review, Reservation, ReviewWithLevel } from '../../shared/types'
 
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>()
@@ -67,12 +69,7 @@ export default function BookDetail() {
   const [returnSuccess, setReturnSuccess] = useState(false)
   const [notifiedName, setNotifiedName] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!id) return
-    loadData()
-  }, [id])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -98,7 +95,12 @@ export default function BookDetail() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    if (!id) return
+    loadData()
+  }, [id, loadData])
 
   async function handleSubmitReview(e: React.FormEvent) {
     e.preventDefault()
@@ -774,13 +776,22 @@ export default function BookDetail() {
                   >
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-coffee-400 to-coffee-600 flex items-center justify-center flex-shrink-0">
+                        <Link to={`/readers/${encodeURIComponent(review.nickname)}`} className="w-8 h-8 rounded-full bg-gradient-to-br from-coffee-400 to-coffee-600 flex items-center justify-center flex-shrink-0 hover:opacity-80 transition-opacity">
                           <span className="text-white text-sm font-medium">
                             {review.nickname.charAt(0)}
                           </span>
-                        </div>
+                        </Link>
                         <div>
-                          <p className="text-sm font-medium text-coffee-800">{review.nickname}</p>
+                          <div className="flex items-center gap-1.5">
+                            <Link to={`/readers/${encodeURIComponent(review.nickname)}`} className="text-sm font-medium text-coffee-800 hover:text-coffee-600 transition-colors">
+                              {review.nickname}
+                            </Link>
+                            {(review as ReviewWithLevel).level && (
+                              <span className={cn('badge border text-[10px]', readerLevelColor[(review as ReviewWithLevel).level!])}>
+                                {readerLevelLabel[(review as ReviewWithLevel).level!]}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-coffee-400">{formatDateTime(review.createdAt)}</p>
                         </div>
                       </div>

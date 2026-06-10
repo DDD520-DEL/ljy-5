@@ -71,6 +71,7 @@ export interface CreateBookRequest {
   sourceInfo?: string
   coverImage?: string
   description?: string
+  donor?: string
 }
 
 export interface CreateReviewRequest {
@@ -119,4 +120,66 @@ export interface ReorderReservationRequest {
 export interface UpdateMeetupSummaryRequest {
   groupPhotos?: string[]
   discussionNotes?: string
+}
+
+export type ReaderLevel = 'bookworm' | 'booklover' | 'bookmaniac' | 'bookcollector'
+
+export const READER_LEVELS: Record<ReaderLevel, { name: string; minPoints: number; color: string }> = {
+  bookworm: { name: '书虫', minPoints: 0, color: 'bg-coffee-100 text-coffee-700 border-coffee-200' },
+  booklover: { name: '书迷', minPoints: 100, color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  bookmaniac: { name: '书痴', minPoints: 300, color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  bookcollector: { name: '藏书家', minPoints: 600, color: 'bg-purple-100 text-purple-700 border-purple-200' },
+}
+
+export type PointsActionType = 'borrow' | 'review' | 'meetup' | 'donation'
+
+export const POINTS_ACTION: Record<PointsActionType, { name: string; points: number }> = {
+  borrow: { name: '借阅图书', points: 5 },
+  review: { name: '发表书评', points: 10 },
+  meetup: { name: '参加读书会', points: 15 },
+  donation: { name: '捐赠图书', points: 20 },
+}
+
+export interface PointsAccount {
+  id: number
+  nickname: string
+  points: number
+  level: ReaderLevel
+  borrowCount: number
+  reviewCount: number
+  meetupCount: number
+  donationCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PointsLog {
+  id: number
+  accountId: number
+  nickname: string
+  action: PointsActionType
+  points: number
+  description: string
+  relatedId?: number
+  createdAt: string
+}
+
+export interface ReviewWithLevel extends Review {
+  level?: ReaderLevel
+}
+
+export interface ReaderRanking {
+  nickname: string
+  points: number
+  level: ReaderLevel
+  borrowCount: number
+}
+
+export interface ReaderProfile {
+  account: PointsAccount
+  logs: PointsLog[]
+  borrowHistory: { book: Book; traceLog: TraceLog }[]
+  reviews: Review[]
+  meetups: { meetup: Meetup; registration: Registration }[]
+  donations: Book[]
 }

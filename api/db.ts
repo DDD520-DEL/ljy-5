@@ -1,7 +1,8 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile } from '../shared/types'
+import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -182,6 +183,43 @@ const initialReservations: Reservation[] = [
   { id: 3, bookId: 2, nickname: '童话少女', status: 'notified', position: 1, createdAt: '2026-01-08T09:00:00.000Z', notifiedAt: '2026-01-09T10:00:00.000Z' }
 ]
 
+function calculateLevel(points: number): ReaderLevel {
+  const levels = Object.entries(READER_LEVELS) as [ReaderLevel, typeof READER_LEVELS[ReaderLevel]][]
+  levels.sort((a, b) => b[1].minPoints - a[1].minPoints)
+  for (const [level, config] of levels) {
+    if (points >= config.minPoints) {
+      return level
+    }
+  }
+  return 'bookworm'
+}
+
+const initialPointsAccounts: PointsAccount[] = [
+  { id: 1, nickname: '爱读书的猫', points: 25, level: 'bookworm', borrowCount: 1, reviewCount: 2, meetupCount: 0, donationCount: 0, createdAt: '2025-11-20T10:00:00.000Z', updatedAt: '2025-12-18T22:30:00.000Z' },
+  { id: 2, nickname: '夜读者', points: 15, level: 'bookworm', borrowCount: 1, reviewCount: 1, meetupCount: 0, donationCount: 0, createdAt: '2025-12-05T16:00:00.000Z', updatedAt: '2025-12-18T22:30:00.000Z' },
+  { id: 3, nickname: '书虫阿明', points: 10, level: 'bookworm', borrowCount: 0, reviewCount: 1, meetupCount: 0, donationCount: 0, createdAt: '2026-01-15T14:20:00.000Z', updatedAt: '2026-01-15T14:20:00.000Z' },
+  { id: 4, nickname: '不想长大', points: 15, level: 'bookworm', borrowCount: 1, reviewCount: 1, meetupCount: 0, donationCount: 0, createdAt: '2025-12-05T16:00:00.000Z', updatedAt: '2025-12-10T19:45:00.000Z' },
+  { id: 5, nickname: '小王子的玫瑰', points: 40, level: 'bookworm', borrowCount: 1, reviewCount: 1, meetupCount: 1, donationCount: 0, createdAt: '2025-12-05T16:00:00.000Z', updatedAt: '2026-01-02T21:00:00.000Z' },
+  { id: 6, nickname: '追风筝的人', points: 10, level: 'bookworm', borrowCount: 0, reviewCount: 1, meetupCount: 0, donationCount: 0, createdAt: '2025-11-02T18:30:00.000Z', updatedAt: '2025-11-02T18:30:00.000Z' },
+  { id: 7, nickname: '文字的力量', points: 10, level: 'bookworm', borrowCount: 0, reviewCount: 1, meetupCount: 0, donationCount: 0, createdAt: '2025-09-20T16:00:00.000Z', updatedAt: '2025-09-20T16:00:00.000Z' },
+  { id: 8, nickname: '平凡的人', points: 10, level: 'bookworm', borrowCount: 0, reviewCount: 1, meetupCount: 0, donationCount: 0, createdAt: '2025-10-08T20:15:00.000Z', updatedAt: '2025-10-08T20:15:00.000Z' },
+  { id: 9, nickname: '读书人小刘', points: 5, level: 'bookworm', borrowCount: 1, reviewCount: 0, meetupCount: 0, donationCount: 0, createdAt: '2026-01-10T09:00:00.000Z', updatedAt: '2026-01-10T09:00:00.000Z' },
+  { id: 10, nickname: '文学爱好者', points: 0, level: 'bookworm', borrowCount: 0, reviewCount: 0, meetupCount: 0, donationCount: 0, createdAt: '2026-01-13T15:30:00.000Z', updatedAt: '2026-01-13T15:30:00.000Z' },
+  { id: 11, nickname: '童话少女', points: 5, level: 'bookworm', borrowCount: 1, reviewCount: 0, meetupCount: 0, donationCount: 0, createdAt: '2025-12-05T16:00:00.000Z', updatedAt: '2025-12-05T16:00:00.000Z' },
+]
+
+const initialPointsLogs: PointsLog[] = [
+  { id: 1, accountId: 1, nickname: '爱读书的猫', action: 'borrow', points: 5, description: '借阅《百年孤独》', relatedId: 1, createdAt: '2025-11-20T15:30:00.000Z' },
+  { id: 2, accountId: 1, nickname: '爱读书的猫', action: 'review', points: 10, description: '发表《百年孤独》书评', relatedId: 1, createdAt: '2025-11-25T20:00:00.000Z' },
+  { id: 3, accountId: 1, nickname: '爱读书的猫', action: 'review', points: 10, description: '发表《百年孤独》书评', relatedId: 2, createdAt: '2025-12-18T22:30:00.000Z' },
+  { id: 4, accountId: 2, nickname: '夜读者', action: 'borrow', points: 5, description: '借阅《百年孤独》', relatedId: 1, createdAt: '2026-01-10T09:00:00.000Z' },
+  { id: 5, accountId: 2, nickname: '夜读者', action: 'review', points: 10, description: '发表《百年孤独》书评', relatedId: 3, createdAt: '2026-01-15T14:20:00.000Z' },
+  { id: 6, accountId: 5, nickname: '小王子的玫瑰', action: 'borrow', points: 5, description: '借阅《小王子》', relatedId: 2, createdAt: '2025-12-05T16:00:00.000Z' },
+  { id: 7, accountId: 5, nickname: '小王子的玫瑰', action: 'review', points: 10, description: '发表《小王子》书评', relatedId: 5, createdAt: '2026-01-02T21:00:00.000Z' },
+  { id: 8, accountId: 5, nickname: '小王子的玫瑰', action: 'meetup', points: 15, description: '参加《春日读书会：关于成长的故事》', relatedId: 2, createdAt: '2026-05-01T10:00:00.000Z' },
+  { id: 9, accountId: 5, nickname: '小王子的玫瑰', action: 'meetup', points: 10, description: '参加《百年孤独》共读之夜', relatedId: 1, createdAt: '2026-06-02T11:00:00.000Z' },
+]
+
 export interface Database {
   books: Book[]
   traceLogs: TraceLog[]
@@ -189,12 +227,16 @@ export interface Database {
   meetups: Meetup[]
   registrations: Registration[]
   reservations: Reservation[]
+  pointsAccounts: PointsAccount[]
+  pointsLogs: PointsLog[]
   nextBookId: number
   nextTraceLogId: number
   nextReviewId: number
   nextMeetupId: number
   nextRegistrationId: number
   nextReservationId: number
+  nextPointsAccountId: number
+  nextPointsLogId: number
 }
 
 const initialDB: Database = {
@@ -204,12 +246,16 @@ const initialDB: Database = {
   meetups: initialMeetups,
   registrations: initialRegistrations,
   reservations: initialReservations,
+  pointsAccounts: initialPointsAccounts,
+  pointsLogs: initialPointsLogs,
   nextBookId: 6,
   nextTraceLogId: 9,
   nextReviewId: 9,
   nextMeetupId: 4,
   nextRegistrationId: 4,
-  nextReservationId: 4
+  nextReservationId: 4,
+  nextPointsAccountId: 12,
+  nextPointsLogId: 10
 }
 
 let db: Database = initialDB
@@ -260,7 +306,7 @@ export function persistDB() {
   saveDB(db)
 }
 
-export function addBook(bookData: Omit<Book, 'id' | 'traceId' | 'createdAt' | 'borrowCount' | 'discussCount'>): Book {
+export function addBook(bookData: Omit<Book, 'id' | 'traceId' | 'createdAt' | 'borrowCount' | 'discussCount'> & { donor?: string }): { book: Book; pointsResult?: ReturnType<typeof addPoints> } {
   const newBook: Book = {
     ...bookData,
     id: db.nextBookId++,
@@ -272,9 +318,19 @@ export function addBook(bookData: Omit<Book, 'id' | 'traceId' | 'createdAt' | 'b
   db.books.push(newBook)
   
   addTraceLog(newBook.id, '入库', getSourceDescription(newBook.sourceType, newBook.sourceInfo), '书店管理员')
+
+  let pointsResult
+  if (bookData.sourceType === 'donation' && bookData.donor) {
+    pointsResult = addPoints(
+      bookData.donor,
+      'donation',
+      `捐赠《${newBook.title}》`,
+      newBook.id
+    )
+  }
   
   persistDB()
-  return newBook
+  return { book: newBook, pointsResult }
 }
 
 function getSourceDescription(sourceType: SourceType, sourceInfo?: string): string {
@@ -300,7 +356,7 @@ export function addTraceLog(bookId: number, action: TraceLog['action'], descript
   return log
 }
 
-export function addReview(bookId: number, data: Omit<Review, 'id' | 'bookId' | 'createdAt'>): Review {
+export function addReview(bookId: number, data: Omit<Review, 'id' | 'bookId' | 'createdAt'>): { review: Review; pointsResult?: ReturnType<typeof addPoints> } {
   const review: Review = {
     ...data,
     id: db.nextReviewId++,
@@ -313,9 +369,19 @@ export function addReview(bookId: number, data: Omit<Review, 'id' | 'bookId' | '
   if (book) {
     book.discussCount++
   }
+
+  let pointsResult
+  if (data.nickname) {
+    pointsResult = addPoints(
+      data.nickname,
+      'review',
+      `发表《${book?.title || '图书'}》书评`,
+      review.id
+    )
+  }
   
   persistDB()
-  return review
+  return { review, pointsResult }
 }
 
 export function addMeetup(data: Omit<Meetup, 'id' | 'currentParticipants' | 'status' | 'createdAt'>): Meetup {
@@ -331,7 +397,7 @@ export function addMeetup(data: Omit<Meetup, 'id' | 'currentParticipants' | 'sta
   return meetup
 }
 
-export function registerMeetup(meetupId: number, data: Omit<Registration, 'id' | 'meetupId' | 'createdAt'>): Registration | null {
+export function registerMeetup(meetupId: number, data: Omit<Registration, 'id' | 'meetupId' | 'createdAt'>): { registration: Registration; pointsResult?: ReturnType<typeof addPoints> } | null {
   const meetup = db.meetups.find(m => m.id === meetupId)
   if (!meetup || meetup.currentParticipants >= meetup.maxParticipants) {
     return null
@@ -345,9 +411,19 @@ export function registerMeetup(meetupId: number, data: Omit<Registration, 'id' |
   }
   db.registrations.push(registration)
   meetup.currentParticipants++
+
+  let pointsResult
+  if (data.nickname) {
+    pointsResult = addPoints(
+      data.nickname,
+      'meetup',
+      `参加《${meetup.title}》读书会`,
+      meetupId
+    )
+  }
   
   persistDB()
-  return registration
+  return { registration, pointsResult }
 }
 
 export function updateMeetupSummary(meetupId: number, data: { groupPhotos?: string[]; discussionNotes?: string }): Meetup | null {
@@ -509,4 +585,166 @@ export function resetToInitialData(): void {
   db = { ...initialDB }
   persistDB()
   console.log('[DB] 已重置为初始数据')
+}
+
+export function getOrCreatePointsAccount(nickname: string): PointsAccount {
+  let account = db.pointsAccounts.find(a => a.nickname === nickname)
+  if (!account) {
+    account = {
+      id: db.nextPointsAccountId++,
+      nickname,
+      points: 0,
+      level: 'bookworm',
+      borrowCount: 0,
+      reviewCount: 0,
+      meetupCount: 0,
+      donationCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    db.pointsAccounts.push(account)
+    persistDB()
+    console.log(`[Points] 为用户 ${nickname} 创建积分账户`)
+  }
+  return account
+}
+
+export function getPointsAccount(nickname: string): PointsAccount | null {
+  return db.pointsAccounts.find(a => a.nickname === nickname) || null
+}
+
+export function addPoints(
+  nickname: string,
+  action: PointsActionType,
+  description: string,
+  relatedId?: number
+): { account: PointsAccount; log: PointsLog; levelUp: boolean } {
+  const account = getOrCreatePointsAccount(nickname)
+  const actionConfig = POINTS_ACTION[action]
+  const oldLevel = account.level
+  const oldPoints = account.points
+
+  account.points += actionConfig.points
+  account.updatedAt = new Date().toISOString()
+
+  const countKey = `${action}Count` as keyof PointsAccount
+  if (countKey in account && typeof account[countKey] === 'number') {
+    (account[countKey] as number)++
+  }
+
+  const newLevel = calculateLevel(account.points)
+  account.level = newLevel
+  const levelUp = oldLevel !== newLevel
+
+  const log: PointsLog = {
+    id: db.nextPointsLogId++,
+    accountId: account.id,
+    nickname,
+    action,
+    points: actionConfig.points,
+    description,
+    relatedId,
+    createdAt: new Date().toISOString(),
+  }
+  db.pointsLogs.push(log)
+
+  persistDB()
+
+  if (levelUp) {
+    console.log(`[Points] 用户 ${nickname} 升级! ${oldLevel}(${oldPoints}) -> ${newLevel}(${account.points})`)
+  } else {
+    console.log(`[Points] 用户 ${nickname} 获得 ${actionConfig.points} 积分, 当前: ${account.points}`)
+  }
+
+  return { account, log, levelUp }
+}
+
+export function getPointsRanking(limit: number = 10): ReaderRanking[] {
+  return [...db.pointsAccounts]
+    .sort((a, b) => b.points - a.points)
+    .slice(0, limit)
+    .map(a => ({
+      nickname: a.nickname,
+      points: a.points,
+      level: a.level,
+      borrowCount: a.borrowCount,
+    }))
+}
+
+export function getBorrowRanking(limit: number = 10): ReaderRanking[] {
+  return [...db.pointsAccounts]
+    .sort((a, b) => b.borrowCount - a.borrowCount)
+    .slice(0, limit)
+    .map(a => ({
+      nickname: a.nickname,
+      points: a.points,
+      level: a.level,
+      borrowCount: a.borrowCount,
+    }))
+}
+
+export function getPointsLogs(nickname: string, limit: number = 20): PointsLog[] {
+  const account = getPointsAccount(nickname)
+  if (!account) return []
+  return db.pointsLogs
+    .filter(l => l.accountId === account.id)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit)
+}
+
+export function getReaderProfile(nickname: string): ReaderProfile | null {
+  const account = getPointsAccount(nickname)
+  if (!account) return null
+
+  const logs = getPointsLogs(nickname, 50)
+
+  const borrowHistory = db.traceLogs
+    .filter(l => l.action === '借出' && l.description.includes(nickname))
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .map(l => {
+      const book = db.books.find(b => b.id === l.bookId)
+      return book ? { book, traceLog: l } : null
+    })
+    .filter((item): item is { book: Book; traceLog: TraceLog } => item !== null)
+
+  const reviews = db.reviews
+    .filter(r => r.nickname === nickname)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+  const meetups = db.registrations
+    .filter(r => r.nickname === nickname)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .map(r => {
+      const meetup = db.meetups.find(m => m.id === r.meetupId)
+      return meetup ? { meetup, registration: r } : null
+    })
+    .filter((item): item is { meetup: Meetup; registration: Registration } => item !== null)
+
+  const donations = db.books
+    .filter(b => b.sourceType === 'donation' && b.sourceInfo?.includes(nickname))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+  return {
+    account,
+    logs,
+    borrowHistory,
+    reviews,
+    meetups,
+    donations,
+  }
+}
+
+export function getReviewWithLevel(review: Review): Review & { level?: string } {
+  const account = getPointsAccount(review.nickname)
+  if (account) {
+    return { ...review, level: account.level }
+  }
+  return review
+}
+
+export function getReviewsWithLevel(bookId: number): Review[] {
+  const reviews = db.reviews
+    .filter(r => r.bookId === bookId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  return reviews.map(r => getReviewWithLevel(r))
 }
