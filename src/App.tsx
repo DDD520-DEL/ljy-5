@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Layout from "@/components/Layout";
+import Home from "@/pages/Home";
 import Dashboard from "@/pages/Dashboard";
 import BookList from "@/pages/BookList";
 import BookAdd from "@/pages/BookAdd";
@@ -13,9 +14,10 @@ export default function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/" element={<Home />} />
         <Route path="/trace/:traceId" element={<TraceView />} />
         <Route element={<Layout />}>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/books" element={<BookList />} />
           <Route path="/books/new" element={<BookAdd />} />
           <Route path="/books/:id" element={<BookDetail />} />

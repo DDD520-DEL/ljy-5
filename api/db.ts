@@ -1,4 +1,18 @@
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import type { Book, TraceLog, Review, Meetup, Registration, SourceType } from '../shared/types'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const DATA_DIR = path.join(__dirname, '..', 'data')
+const DATA_FILE = path.join(DATA_DIR, 'bookstore.json')
+
+function ensureDataDir() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true })
+  }
+}
 
 function randomTraceId(): string {
   return 'BOOK-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 8).toUpperCase()
@@ -175,7 +189,7 @@ export interface Database {
   nextRegistrationId: number
 }
 
-let db: Database = {
+const initialDB: Database = {
   books: initialBooks,
   traceLogs: initialTraceLogs,
   reviews: initialReviews,
@@ -188,8 +202,52 @@ let db: Database = {
   nextRegistrationId: 4
 }
 
+let db: Database = initialDB
+
+function loadDB(): Database {
+  ensureDataDir()
+  if (fs.existsSync(DATA_FILE)) {
+    try {
+      const raw = fs.readFileSync(DATA_FILE, 'utf-8')
+      const parsed = JSON.parse(raw)
+      console.log(`[DB] 已从 ${DATA_FILE} 加载数据`)
+      console.log(`[DB] 图书: ${parsed.books.length} 本 | 读书会: ${parsed.meetups.length} 个 | 短评: ${parsed.reviews.length} 条`)
+      return parsed
+    } catch (err) {
+      console.error('[DB] 数据文件读取失败，使用初始数据:', err)
+      return { ...initialDB }
+    }
+  }
+  console.log('[DB] 未找到数据文件，使用初始数据并创建持久化文件')
+  saveDB(initialDB)
+  return { ...initialDB }
+}
+
+let saveTimer: NodeJS.Timeout | null = null
+
+function saveDB(data: Database) {
+  ensureDataDir()
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+  }
+  saveTimer = setTimeout(() => {
+    try {
+      fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8')
+      console.log(`[DB] 数据已持久化到 ${DATA_FILE}`)
+    } catch (err) {
+      console.error('[DB] 数据持久化失败:', err)
+    }
+  }, 100)
+}
+
+db = loadDB()
+
 export function getDB(): Database {
   return db
+}
+
+export function persistDB() {
+  saveDB(db)
 }
 
 export function addBook(bookData: Omit<Book, 'id' | 'traceId' | 'createdAt' | 'borrowCount' | 'discussCount'>): Book {
@@ -205,6 +263,7 @@ export function addBook(bookData: Omit<Book, 'id' | 'traceId' | 'createdAt' | 'b
   
   addTraceLog(newBook.id, '入库', getSourceDescription(newBook.sourceType, newBook.sourceInfo), '书店管理员')
   
+  persistDB()
   return newBook
 }
 
@@ -227,6 +286,7 @@ export function addTraceLog(bookId: number, action: TraceLog['action'], descript
     operator
   }
   db.traceLogs.push(log)
+  persistDB()
   return log
 }
 
@@ -244,6 +304,7 @@ export function addReview(bookId: number, data: Omit<Review, 'id' | 'bookId' | '
     book.discussCount++
   }
   
+  persistDB()
   return review
 }
 
@@ -256,6 +317,7 @@ export function addMeetup(data: Omit<Meetup, 'id' | 'currentParticipants' | 'sta
     createdAt: new Date().toISOString()
   }
   db.meetups.push(meetup)
+  persistDB()
   return meetup
 }
 
@@ -274,6 +336,7 @@ export function registerMeetup(meetupId: number, data: Omit<Registration, 'id' |
   db.registrations.push(registration)
   meetup.currentParticipants++
   
+  persistDB()
   return registration
 }
 
@@ -289,6 +352,7 @@ export function updateMeetupSummary(meetupId: number, data: { groupPhotos?: stri
   }
   meetup.status = 'finished'
   
+  persistDB()
   return meetup
 }
 
@@ -296,5 +360,12 @@ export function incrementBorrowCount(bookId: number): void {
   const book = db.books.find(b => b.id === bookId)
   if (book) {
     book.borrowCount++
+    persistDB()
   }
+}
+
+export function resetToInitialData(): void {
+  db = { ...initialDB }
+  persistDB()
+  console.log('[DB] 已重置为初始数据')
 }

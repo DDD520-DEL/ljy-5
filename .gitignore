@@ -23,3 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 .vite
+
+# env
+.env
+.env.*
+
+# data
+data/

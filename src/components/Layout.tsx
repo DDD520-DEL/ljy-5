@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookPlus, Library, Users, PlusCircle, BookOpen } from 'lucide-react'
+import { LayoutDashboard, BookPlus, Library, Users, PlusCircle, BookOpen, Home } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default function Layout() {
@@ -15,7 +15,8 @@ export default function Layout() {
   }
 
   const navItems = [
-    { to: '/', label: '仪表盘', icon: LayoutDashboard },
+    { to: '/', label: '书店首页', icon: Home, external: true },
+    { to: '/dashboard', label: '管理仪表盘', icon: LayoutDashboard },
     { to: '/books', label: '库存管理', icon: Library },
     { to: '/books/new', label: '图书入库', icon: BookPlus },
     { to: '/meetups', label: '读书会', icon: Users },
@@ -37,24 +38,38 @@ export default function Layout() {
           </div>
         </div>
         <nav className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
-                  isActive
-                    ? 'bg-coffee-50 text-coffee-800 shadow-sm'
-                    : 'text-coffee-600 hover:bg-coffee-50 hover:text-coffee-800'
-                )
-              }
-            >
-              <item.icon className="w-4.5 h-4.5" />
-              {item.label}
-            </NavLink>
-          ))}
+          {navItems.map((item) => {
+            if (item.external) {
+              return (
+                <a
+                  key={item.to}
+                  href={item.to}
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-coffee-600 hover:bg-coffee-50 hover:text-coffee-800"
+                >
+                  <item.icon className="w-4.5 h-4.5" />
+                  {item.label}
+                </a>
+              )
+            }
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/dashboard'}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                    isActive
+                      ? 'bg-coffee-50 text-coffee-800 shadow-sm'
+                      : 'text-coffee-600 hover:bg-coffee-50 hover:text-coffee-800'
+                  )
+                }
+              >
+                <item.icon className="w-4.5 h-4.5" />
+                {item.label}
+              </NavLink>
+            )
+          })}
         </nav>
         <div className="p-4 border-t border-coffee-100">
           <div className="p-3 rounded-lg bg-coffee-50">
@@ -75,24 +90,38 @@ export default function Layout() {
             </div>
           </div>
           <nav className="flex gap-1 mt-3 overflow-x-auto pb-1">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/'}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all',
-                    isActive
-                      ? 'bg-coffee-100 text-coffee-800'
-                      : 'text-coffee-600 hover:bg-coffee-50'
-                  )
-                }
-              >
-                <item.icon className="w-3.5 h-3.5" />
-                {item.label}
-              </NavLink>
-            ))}
+            {navItems.map((item) => {
+              if (item.external) {
+                return (
+                  <a
+                    key={item.to}
+                    href={item.to}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all text-coffee-600 hover:bg-coffee-50"
+                  >
+                    <item.icon className="w-3.5 h-3.5" />
+                    {item.label}
+                  </a>
+                )
+              }
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === '/dashboard'}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all',
+                      isActive
+                        ? 'bg-coffee-100 text-coffee-800'
+                        : 'text-coffee-600 hover:bg-coffee-50'
+                    )
+                  }
+                >
+                  <item.icon className="w-3.5 h-3.5" />
+                  {item.label}
+                </NavLink>
+              )
+            })}
           </nav>
         </header>
         <main className="flex-1 p-4 md:p-8 overflow-auto">

@@ -112,7 +112,9 @@ router.get('/:id/qrcode', async (req, res) => {
     return
   }
   
-  const traceUrl = `${req.protocol}://${req.get('host')}/trace/${book.traceId}`
+  const publicBaseUrl = process.env.PUBLIC_BASE_URL || 
+    `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers['x-forwarded-host'] || req.get('host')}`
+  const traceUrl = `${publicBaseUrl}/trace/${book.traceId}`
   
   try {
     const dataUrl = await QRCode.toDataURL(traceUrl, {
