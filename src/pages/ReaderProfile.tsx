@@ -15,6 +15,9 @@ import {
   ChevronRight,
   Sparkles,
   Clock,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
 } from 'lucide-react'
 import { bookApi } from '@/lib/api'
 import {
@@ -26,9 +29,11 @@ import {
   pointsActionLabel,
   pointsActionColor,
   getLevelProgress,
+  donationReviewStatusLabel,
+  donationReviewStatusColor,
   cn,
 } from '@/lib/utils'
-import type { ReaderProfile as ReaderProfileType, Review, PointsLog } from '../../shared/types'
+import type { ReaderProfile as ReaderProfileType, Review, PointsLog, DonationReview } from '../../shared/types'
 
 export default function ReaderProfile() {
   const { nickname } = useParams<{ nickname: string }>()
@@ -95,7 +100,7 @@ export default function ReaderProfile() {
     )
   }
 
-  const { account, logs, borrowHistory, reviews, meetups, donations } = profile
+  const { account, logs, borrowHistory, reviews, meetups, donations, donationReviews } = profile
   const levelProgress = getLevelProgress(account.points)
 
   const stats = [
@@ -111,7 +116,7 @@ export default function ReaderProfile() {
     { id: 'borrow', label: '借阅历史', icon: BookOpen, count: borrowHistory.length },
     { id: 'reviews', label: '发表书评', icon: MessageSquare, count: reviews.length },
     { id: 'meetups', label: '读书会', icon: Users, count: meetups.length },
-    { id: 'donations', label: '捐赠图书', icon: Gift, count: donations.length },
+    { id: 'donations', label: '捐赠图书', icon: Gift, count: donations.length + (donationReviews?.length || 0) },
   ] as const
 
   return (
@@ -398,29 +403,101 @@ export default function ReaderProfile() {
               )}
 
               {activeTab === 'donations' && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {donations.length === 0 ? (
-                    <div className="col-span-full text-center py-12">
-                      <Gift className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
-                      <p className="text-coffee-400">暂无捐赠记录</p>
-                    </div>
-                  ) : (
-                    donations.map((book) => (
-                      <Link key={book.id} to={`/books/${book.id}`} className="group">
-                        <div className="aspect-[3/4] rounded-lg overflow-hidden shadow-sm group-hover:shadow-md transition-shadow mb-2 bg-coffee-100">
-                          {book.coverImage ? (
-                            <img src={book.coverImage} alt={book.title} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-coffee-400">
-                              <Book className="w-8 h-8" />
+                <div className="space-y-6">
+                  {(donationReviews && donationReviews.length > 0) && (
+                    <div>
+                      <h4 className="text-sm font-medium text-coffee-700 mb-3 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-500" />
+                        审核进度
+                      </h4>
+                      <div className="space-y-3">
+                        {donationReviews.map((review: DonationReview) => (
+                          <div
+                            key={review.id}
+                            className={cn(
+                              'p-4 rounded-xl border transition-colors',
+                              review.status === 'pending' && 'bg-amber-50/50 border-amber-200',
+                              review.status === 'approved' && 'bg-emerald-50/50 border-emerald-200',
+                              review.status === 'rejected' && 'bg-red-50/50 border-red-200',
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="font-medium text-coffee-800 truncate">{review.title}</p>
+                                  <span className={cn('badge border text-[10px]', donationReviewStatusColor[review.status])}>
+                                    {donationReviewStatusLabel[review.status]}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-coffee-500">{review.author}</p>
+                                <p className="text-xs text-coffee-400 flex items-center gap-1 mt-1">
+                                  <Clock className="w-3 h-3" />
+                                  提交于 {formatDateTime(review.createdAt)}
+                                </p>
+                                {review.status === 'approved' && review.bookId && (
+                                  <Link
+                                    to={`/books/${review.bookId}`}
+                                    className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800 mt-2 transition-colors"
+                                  >
+                                    <CheckCircle className="w-3 h-3" />
+                                    查看已入库图书
+                                    <ChevronRight className="w-3 h-3" />
+                                  </Link>
+                                )}
+                                {review.status === 'rejected' && review.reviewNote && (
+                                  <div className="mt-2 p-2 bg-red-50 rounded-md border border-red-100">
+                                    <p className="text-xs text-red-600">
+                                      <span className="font-medium">驳回原因：</span>{review.reviewNote}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-shrink-0">
+                                {review.status === 'pending' && <Clock className="w-5 h-5 text-amber-400" />}
+                                {review.status === 'approved' && <CheckCircle className="w-5 h-5 text-emerald-500" />}
+                                {review.status === 'rejected' && <XCircle className="w-5 h-5 text-red-400" />}
+                              </div>
                             </div>
-                          )}
-                        </div>
-                        <p className="text-sm font-medium text-coffee-900 truncate group-hover:text-coffee-700">{book.title}</p>
-                        <p className="text-xs text-coffee-500 truncate">{book.author}</p>
-                      </Link>
-                    ))
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
+
+                  <div>
+                    {donations.length === 0 && (!donationReviews || donationReviews.length === 0) ? (
+                      <div className="text-center py-12">
+                        <Gift className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+                        <p className="text-coffee-400">暂无捐赠记录</p>
+                      </div>
+                    ) : donations.length > 0 ? (
+                      <div>
+                        {(donationReviews && donationReviews.length > 0) && (
+                          <h4 className="text-sm font-medium text-coffee-700 mb-3 flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 text-emerald-500" />
+                            已入库图书
+                          </h4>
+                        )}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {donations.map((book) => (
+                            <Link key={book.id} to={`/books/${book.id}`} className="group">
+                              <div className="aspect-[3/4] rounded-lg overflow-hidden shadow-sm group-hover:shadow-md transition-shadow mb-2 bg-coffee-100">
+                                {book.coverImage ? (
+                                  <img src={book.coverImage} alt={book.title} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-coffee-400">
+                                    <Book className="w-8 h-8" />
+                                  </div>
+                                )}
+                              </div>
+                              <p className="text-sm font-medium text-coffee-900 truncate group-hover:text-coffee-700">{book.title}</p>
+                              <p className="text-xs text-coffee-500 truncate">{book.author}</p>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               )}
             </div>

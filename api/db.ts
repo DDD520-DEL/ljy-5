@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -229,6 +229,7 @@ export interface Database {
   reservations: Reservation[]
   pointsAccounts: PointsAccount[]
   pointsLogs: PointsLog[]
+  donationReviews: DonationReview[]
   nextBookId: number
   nextTraceLogId: number
   nextReviewId: number
@@ -237,6 +238,7 @@ export interface Database {
   nextReservationId: number
   nextPointsAccountId: number
   nextPointsLogId: number
+  nextDonationReviewId: number
 }
 
 const initialDB: Database = {
@@ -248,6 +250,7 @@ const initialDB: Database = {
   reservations: initialReservations,
   pointsAccounts: initialPointsAccounts,
   pointsLogs: initialPointsLogs,
+  donationReviews: [],
   nextBookId: 6,
   nextTraceLogId: 9,
   nextReviewId: 9,
@@ -255,7 +258,8 @@ const initialDB: Database = {
   nextRegistrationId: 4,
   nextReservationId: 4,
   nextPointsAccountId: 12,
-  nextPointsLogId: 10
+  nextPointsLogId: 10,
+  nextDonationReviewId: 1
 }
 
 let db: Database = initialDB
@@ -724,6 +728,8 @@ export function getReaderProfile(nickname: string): ReaderProfile | null {
     .filter(b => b.sourceType === 'donation' && b.sourceInfo?.includes(nickname))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
+  const donationReviews = getDonationReviewsByDonor(nickname)
+
   return {
     account,
     logs,
@@ -731,6 +737,7 @@ export function getReaderProfile(nickname: string): ReaderProfile | null {
     reviews,
     meetups,
     donations,
+    donationReviews,
   }
 }
 
@@ -747,4 +754,97 @@ export function getReviewsWithLevel(bookId: number): Review[] {
     .filter(r => r.bookId === bookId)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   return reviews.map(r => getReviewWithLevel(r))
+}
+
+export function createDonationReview(data: Omit<DonationReview, 'id' | 'status' | 'reviewNote' | 'reviewedAt' | 'reviewer' | 'bookPhotos' | 'bookId' | 'createdAt' | 'updatedAt'>): DonationReview {
+  const now = new Date().toISOString()
+  const review: DonationReview = {
+    ...data,
+    id: db.nextDonationReviewId++,
+    status: 'pending',
+    createdAt: now,
+    updatedAt: now,
+  }
+  db.donationReviews.push(review)
+  persistDB()
+  console.log(`[DonationReview] 新捐赠审核申请: ${data.title} (捐赠者: ${data.donor})`)
+  return review
+}
+
+export function getPendingDonationReviews(): DonationReview[] {
+  return db.donationReviews
+    .filter(r => r.status === 'pending')
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+}
+
+export function getAllDonationReviews(): DonationReview[] {
+  return db.donationReviews
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+export function getDonationReviewById(id: number): DonationReview | null {
+  return db.donationReviews.find(r => r.id === id) || null
+}
+
+export function getDonationReviewsByDonor(donor: string): DonationReview[] {
+  return db.donationReviews
+    .filter(r => r.donor === donor)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+export function approveDonationReview(
+  id: number,
+  corrections: Partial<Pick<DonationReview, 'title' | 'author' | 'isbn' | 'publisher' | 'category' | 'sourceInfo' | 'coverImage' | 'description'>> & { bookPhotos?: string[]; reviewer?: string }
+): { review: DonationReview; book: Book; pointsResult?: ReturnType<typeof addPoints> } | null {
+  const review = db.donationReviews.find(r => r.id === id)
+  if (!review || review.status !== 'pending') return null
+
+  const now = new Date().toISOString()
+  review.status = 'approved'
+  review.reviewer = corrections.reviewer || '管理员'
+  review.reviewedAt = now
+  review.updatedAt = now
+
+  if (corrections.bookPhotos) {
+    review.bookPhotos = corrections.bookPhotos
+  }
+
+  const bookData: Omit<Book, 'id' | 'traceId' | 'createdAt' | 'borrowCount' | 'discussCount'> & { donor?: string } = {
+    title: corrections.title || review.title,
+    author: corrections.author || review.author,
+    isbn: corrections.isbn || review.isbn,
+    publisher: corrections.publisher || review.publisher,
+    category: corrections.category || review.category,
+    sourceType: 'donation',
+    sourceInfo: corrections.sourceInfo || review.sourceInfo || `由${review.donor}捐赠`,
+    coverImage: corrections.coverImage || review.coverImage,
+    description: corrections.description || review.description,
+    donor: review.donor,
+  }
+
+  const result = addBook(bookData)
+  review.bookId = result.book.id
+
+  addTraceLog(result.book.id, '捐赠', `${review.donor}捐赠《${result.book.title}》，审核通过正式入库`, review.reviewer)
+
+  persistDB()
+  console.log(`[DonationReview] 捐赠审核通过: ${review.title} -> 图书ID ${result.book.id}`)
+
+  return { review, book: result.book, pointsResult: result.pointsResult }
+}
+
+export function rejectDonationReview(id: number, reviewNote: string, reviewer?: string): DonationReview | null {
+  const review = db.donationReviews.find(r => r.id === id)
+  if (!review || review.status !== 'pending') return null
+
+  const now = new Date().toISOString()
+  review.status = 'rejected'
+  review.reviewNote = reviewNote
+  review.reviewer = reviewer || '管理员'
+  review.reviewedAt = now
+  review.updatedAt = now
+
+  persistDB()
+  console.log(`[DonationReview] 捐赠审核驳回: ${review.title} (原因: ${reviewNote})`)
+  return review
 }

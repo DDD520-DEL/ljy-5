@@ -15,6 +15,10 @@ import type {
   ReaderProfile,
   PointsAccount,
   PointsLog,
+  DonationReview,
+  SubmitDonationRequest,
+  ApproveDonationRequest,
+  RejectDonationRequest,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -124,4 +128,35 @@ export const reservationApi = {
     }),
   stats: () =>
     request<{ count: number }>('/reservations/stats/count'),
+}
+
+export const donationApi = {
+  submit: (data: SubmitDonationRequest) =>
+    request<{ review: DonationReview }>('/donations/submit', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  pending: () =>
+    request<DonationReview[]>('/donations/pending'),
+  all: () =>
+    request<DonationReview[]>('/donations/all'),
+  getByDonor: (nickname: string) =>
+    request<DonationReview[]>(`/donations/donor/${encodeURIComponent(nickname)}`),
+  get: (id: number) =>
+    request<DonationReview>(`/donations/${id}`),
+  approve: (id: number, data: ApproveDonationRequest) =>
+    request<{
+      review: DonationReview
+      book: Book
+      pointsResult?: { account: PointsAccount; log: PointsLog; levelUp: boolean }
+      qrcode: { qrcode: string; traceId: string; traceUrl: string } | null
+    }>(`/donations/${id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  reject: (id: number, data: RejectDonationRequest) =>
+    request<{ review: DonationReview }>(`/donations/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 }

@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookPlus, Library, Users, PlusCircle, BookOpen, Home, BookmarkPlus } from 'lucide-react'
+import { LayoutDashboard, BookPlus, Library, Users, PlusCircle, BookOpen, Home, BookmarkPlus, ClipboardCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default function Layout() {
@@ -19,6 +19,7 @@ export default function Layout() {
     { to: '/dashboard', label: '管理仪表盘', icon: LayoutDashboard },
     { to: '/books', label: '库存管理', icon: Library },
     { to: '/books/new', label: '图书入库', icon: BookPlus },
+    { to: '/donations/review', label: '捐赠审核', icon: ClipboardCheck },
     { to: '/reservations', label: '预约管理', icon: BookmarkPlus },
     { to: '/meetups', label: '读书会', icon: Users },
     { to: '/meetups/new', label: '发起活动', icon: PlusCircle },

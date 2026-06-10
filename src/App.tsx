@@ -11,6 +11,7 @@ import MeetupCreate from "@/pages/MeetupCreate";
 import MeetupDetail from "@/pages/MeetupDetail";
 import ReservationManage from "@/pages/ReservationManage";
 import ReaderProfile from "@/pages/ReaderProfile";
+import DonationReviewPage from "@/pages/DonationReview";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/books" element={<BookList />} />
           <Route path="/books/new" element={<BookAdd />} />
           <Route path="/books/:id" element={<BookDetail />} />
+          <Route path="/donations/review" element={<DonationReviewPage />} />
           <Route path="/meetups" element={<MeetupList />} />
           <Route path="/meetups/new" element={<MeetupCreate />} />
           <Route path="/meetups/:id" element={<MeetupDetail />} />

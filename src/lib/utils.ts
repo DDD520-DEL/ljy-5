@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { SourceType, MeetupStatus, ReaderLevel, PointsActionType } from '../../shared/types'
+import type { SourceType, MeetupStatus, ReaderLevel, PointsActionType, DonationReviewStatus } from '../../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../../shared/types'
 
 export function cn(...inputs: ClassValue[]) {
@@ -101,6 +101,18 @@ export const pointsActionColor: Record<PointsActionType, string> = {
   review: 'bg-emerald-100 text-emerald-700',
   meetup: 'bg-purple-100 text-purple-700',
   donation: 'bg-amber-100 text-amber-700',
+}
+
+export const donationReviewStatusLabel: Record<DonationReviewStatus, string> = {
+  pending: '待审核',
+  approved: '已通过',
+  rejected: '已驳回',
+}
+
+export const donationReviewStatusColor: Record<DonationReviewStatus, string> = {
+  pending: 'bg-amber-50 text-amber-700 border-amber-200',
+  approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  rejected: 'bg-red-50 text-red-700 border-red-200',
 }
 
 export function getNextLevel(points: number): { level: ReaderLevel; minPoints: number } | null {

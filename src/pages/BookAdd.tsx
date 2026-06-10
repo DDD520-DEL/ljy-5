@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { BookPlus, Upload, CheckCircle, QrCode, ArrowRight, X } from 'lucide-react'
-import { bookApi } from '@/lib/api'
+import { BookPlus, Upload, CheckCircle, QrCode, ArrowRight, X, Clock, Gift } from 'lucide-react'
+import { bookApi, donationApi } from '@/lib/api'
 import { sourceTypeLabel, cn } from '@/lib/utils'
 import type { SourceType, CreateBookRequest } from '../../shared/types'
 
-type FormState = Omit<CreateBookRequest, 'sourceType'> & { sourceType: SourceType }
+type FormState = Omit<CreateBookRequest, 'sourceType'> & { sourceType: SourceType; donor: string; donorContact: string }
 
 const initialForm: FormState = {
   title: '',
@@ -17,6 +17,8 @@ const initialForm: FormState = {
   sourceInfo: '',
   coverImage: '',
   description: '',
+  donor: '',
+  donorContact: '',
 }
 
 export default function BookAdd() {
@@ -29,6 +31,10 @@ export default function BookAdd() {
     traceId: string
     qrcode: string
     traceUrl: string
+  } | null>(null)
+  const [donationPending, setDonationPending] = useState<{
+    donor: string
+    title: string
   } | null>(null)
 
   const sourceTypes: SourceType[] = ['donation', 'direct', 'secondhand']
@@ -60,16 +66,37 @@ export default function BookAdd() {
 
     setSubmitting(true)
     try {
-      const result = await bookApi.create(form)
-      const qrData = await bookApi.qrcode(result.book.id)
-      setSuccess({
-        bookId: result.book.id,
-        traceId: result.book.traceId,
-        qrcode: qrData.qrcode,
-        traceUrl: qrData.traceUrl,
-      })
+      if (form.sourceType === 'donation') {
+        if (!form.donor.trim()) {
+          setError('捐赠图书需填写捐赠者昵称')
+          setSubmitting(false)
+          return
+        }
+        await donationApi.submit({
+          title: form.title,
+          author: form.author,
+          isbn: form.isbn || undefined,
+          publisher: form.publisher || undefined,
+          category: form.category,
+          sourceInfo: form.sourceInfo || undefined,
+          coverImage: form.coverImage || undefined,
+          description: form.description || undefined,
+          donor: form.donor,
+          donorContact: form.donorContact || undefined,
+        })
+        setDonationPending({ donor: form.donor, title: form.title })
+      } else {
+        const result = await bookApi.create(form)
+        const qrData = await bookApi.qrcode(result.book.id)
+        setSuccess({
+          bookId: result.book.id,
+          traceId: result.book.traceId,
+          qrcode: qrData.qrcode,
+          traceUrl: qrData.traceUrl,
+        })
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '创建图书失败')
+      setError(err instanceof Error ? err.message : '操作失败')
     } finally {
       setSubmitting(false)
     }
@@ -78,7 +105,63 @@ export default function BookAdd() {
   function handleReset() {
     setForm(initialForm)
     setSuccess(null)
+    setDonationPending(null)
     setError(null)
+  }
+
+  if (donationPending) {
+    return (
+      <div className="max-w-lg mx-auto">
+        <div className="card p-8 text-center">
+          <div className="w-16 h-16 mx-auto rounded-full bg-amber-50 flex items-center justify-center mb-4">
+            <Clock className="w-8 h-8 text-amber-500" />
+          </div>
+          <h2 className="text-2xl font-serif font-bold text-coffee-900 mb-2">捐赠申请已提交！</h2>
+          <p className="text-coffee-500 mb-6">您的捐赠图书正在等待管理员审核，审核通过后将正式入库</p>
+
+          <div className="bg-gradient-to-br from-amber-50 to-coffee-50 rounded-2xl p-6 mb-6 border border-amber-200">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <Gift className="w-5 h-5 text-amber-600" />
+              <span className="font-medium text-coffee-800">《{donationPending.title}》</span>
+            </div>
+            <div className="space-y-2 text-sm text-coffee-600">
+              <p>捐赠者: {donationPending.donor}</p>
+              <p className="flex items-center justify-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                当前状态: 待审核
+              </p>
+            </div>
+          </div>
+
+          <p className="text-coffee-400 text-sm mb-6">
+            审核通过后，系统将自动生成溯源二维码并记录捐赠溯源日志
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              to="/donations/review"
+              className={cn(
+                'inline-flex items-center justify-center gap-2',
+                'btn-primary'
+              )}
+            >
+              <Gift className="w-4 h-4" />
+              查看捐赠审核
+            </Link>
+            <button
+              onClick={handleReset}
+              className={cn(
+                'inline-flex items-center justify-center gap-2',
+                'btn-secondary'
+              )}
+            >
+              <BookPlus className="w-4 h-4" />
+              继续添加
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (success) {
@@ -221,6 +304,12 @@ export default function BookAdd() {
 
         <div className="space-y-4">
           <h3 className="section-title">来源信息</h3>
+          {form.sourceType === 'donation' && (
+            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
+              <Clock className="w-4 h-4 flex-shrink-0" />
+              捐赠图书需经管理员审核通过后方可入库，审核通过将自动生成溯源二维码
+            </div>
+          )}
           <div>
             <label className="label">来源类型 <span className="text-red-500">*</span></label>
             <div className="flex flex-wrap gap-2">
@@ -250,6 +339,30 @@ export default function BookAdd() {
               onChange={(e) => handleChange('sourceInfo', e.target.value)}
             />
           </div>
+          {form.sourceType === 'donation' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">捐赠者昵称 <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="请输入捐赠者昵称"
+                  value={form.donor}
+                  onChange={(e) => handleChange('donor', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label">联系方式</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="可选，方便联系捐赠者"
+                  value={form.donorContact}
+                  onChange={(e) => handleChange('donorContact', e.target.value)}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="w-full h-px bg-coffee-100" />
@@ -324,7 +437,7 @@ export default function BookAdd() {
             ) : (
               <>
                 <CheckCircle className="w-4 h-4" />
-                确认入库
+                {form.sourceType === 'donation' ? '提交捐赠申请' : '确认入库'}
               </>
             )}
           </button>

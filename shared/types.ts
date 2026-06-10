@@ -1,3 +1,27 @@
+export type DonationReviewStatus = 'pending' | 'approved' | 'rejected'
+
+export interface DonationReview {
+  id: number
+  title: string
+  author: string
+  isbn?: string
+  publisher?: string
+  category: string
+  sourceInfo?: string
+  coverImage?: string
+  description?: string
+  donor: string
+  donorContact?: string
+  status: DonationReviewStatus
+  reviewNote?: string
+  reviewedAt?: string
+  reviewer?: string
+  bookPhotos?: string[]
+  bookId?: number
+  createdAt: string
+  updatedAt: string
+}
+
 export type SourceType = 'donation' | 'direct' | 'secondhand'
 
 export interface Book {
@@ -59,6 +83,37 @@ export interface Registration {
   nickname: string
   contact?: string
   createdAt: string
+}
+
+export interface SubmitDonationRequest {
+  title: string
+  author: string
+  isbn?: string
+  publisher?: string
+  category: string
+  sourceInfo?: string
+  coverImage?: string
+  description?: string
+  donor: string
+  donorContact?: string
+}
+
+export interface ApproveDonationRequest {
+  title?: string
+  author?: string
+  isbn?: string
+  publisher?: string
+  category?: string
+  sourceInfo?: string
+  coverImage?: string
+  description?: string
+  bookPhotos?: string[]
+  reviewer?: string
+}
+
+export interface RejectDonationRequest {
+  reviewNote: string
+  reviewer?: string
 }
 
 export interface CreateBookRequest {
@@ -182,4 +237,5 @@ export interface ReaderProfile {
   reviews: Review[]
   meetups: { meetup: Meetup; registration: Registration }[]
   donations: Book[]
+  donationReviews: DonationReview[]
 }
