@@ -19,6 +19,10 @@ import type {
   SubmitDonationRequest,
   ApproveDonationRequest,
   RejectDonationRequest,
+  Note,
+  NoteComment,
+  CreateNoteRequest,
+  CreateNoteCommentRequest,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -158,5 +162,55 @@ export const donationApi = {
     request<{ review: DonationReview }>(`/donations/${id}/reject`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+}
+
+export const noteApi = {
+  listByBook: (bookId: number, nickname?: string) => {
+    const params = new URLSearchParams()
+    if (nickname) params.set('nickname', nickname)
+    const query = params.toString()
+    return request<Note[]>(`/notes/book/${bookId}${query ? `?${query}` : ''}`)
+  },
+  listByUser: (nickname: string, viewer?: string) => {
+    const params = new URLSearchParams()
+    if (viewer) params.set('viewer', viewer)
+    const query = params.toString()
+    return request<Note[]>(`/notes/user/${encodeURIComponent(nickname)}${query ? `?${query}` : ''}`)
+  },
+  get: (id: number) => request<Note>(`/notes/${id}`),
+  getComments: (id: number) => request<NoteComment[]>(`/notes/${id}/comments`),
+  hot: (limit: number = 10, days?: number) => {
+    const params = new URLSearchParams()
+    params.set('limit', limit.toString())
+    if (days) params.set('days', days.toString())
+    const query = params.toString()
+    return request<Note[]>(`/notes/hot?${query}`)
+  },
+  create: (data: CreateNoteRequest) =>
+    request<{ note: Note; pointsResult?: { account: PointsAccount; log: PointsLog; levelUp: boolean } }>('/notes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  like: (id: number, nickname: string) =>
+    request<{ note: Note; liked: boolean }>(`/notes/${id}/like`, {
+      method: 'POST',
+      body: JSON.stringify({ nickname }),
+    }),
+  hasLiked: (id: number, nickname: string) =>
+    request<{ liked: boolean }>(`/notes/${id}/liked?nickname=${encodeURIComponent(nickname)}`),
+  addComment: (id: number, data: CreateNoteCommentRequest) =>
+    request<{ comment: NoteComment; note: Note }>(`/notes/${id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  update: (id: number, data: Partial<Pick<Note, 'title' | 'content' | 'images' | 'visibility'>>) =>
+    request<Note>(`/notes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  delete: (id: number) =>
+    request<{ success: boolean }>(`/notes/${id}`, {
+      method: 'DELETE',
     }),
 }

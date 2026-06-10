@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus, Star, User } from 'lucide-react'
-import { bookApi, meetupApi, reservationApi } from '@/lib/api'
+import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus, Star, User, Heart, PenLine, Flame } from 'lucide-react'
+import { bookApi, meetupApi, reservationApi, noteApi } from '@/lib/api'
 import { formatDate, sourceTypeLabel, sourceTypeColor, meetupStatusLabel, meetupStatusColor, readerLevelLabel, readerLevelColor, cn } from '@/lib/utils'
-import type { Book as BookType, Meetup, ReaderRanking } from '../../shared/types'
+import type { Book as BookType, Meetup, ReaderRanking, Note } from '../../shared/types'
 
 export default function Dashboard() {
   const [books, setBooks] = useState<BookType[]>([])
@@ -15,6 +15,7 @@ export default function Dashboard() {
   const [rankType, setRankType] = useState<'borrow' | 'discuss'>('borrow')
   const [pointsRanking, setPointsRanking] = useState<ReaderRanking[]>([])
   const [borrowCountRanking, setBorrowCountRanking] = useState<ReaderRanking[]>([])
+  const [hotNotes, setHotNotes] = useState<Note[]>([])
 
   useEffect(() => {
     loadData()
@@ -22,7 +23,7 @@ export default function Dashboard() {
 
   async function loadData() {
     try {
-      const [allBooks, borrowRank, discussRank, allMeetups, resStats, pointsRank, borrowCountRank] = await Promise.all([
+      const [allBooks, borrowRank, discussRank, allMeetups, resStats, pointsRank, borrowCountRank, hotNotesData] = await Promise.all([
         bookApi.list(),
         bookApi.ranking('borrow'),
         bookApi.ranking('discuss'),
@@ -30,6 +31,7 @@ export default function Dashboard() {
         reservationApi.stats(),
         bookApi.readerRanking('points', 8),
         bookApi.readerRanking('borrow', 8),
+        noteApi.hot(5, 7),
       ])
       setBooks(allBooks)
       setBorrowRanking(borrowRank)
@@ -38,6 +40,7 @@ export default function Dashboard() {
       setReservationCount(resStats.count)
       setPointsRanking(pointsRank)
       setBorrowCountRanking(borrowCountRank)
+      setHotNotes(hotNotesData)
     } catch (err) {
       console.error(err)
     } finally {
@@ -336,6 +339,65 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="card p-6">
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center">
+            <Flame className="w-4 h-4 text-white" />
+          </div>
+          <h2 className="section-title">本周热门笔记</h2>
+        </div>
+        {hotNotes.length === 0 ? (
+          <div className="text-center py-12">
+            <PenLine className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+            <p className="text-coffee-400">暂无热门笔记</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {hotNotes.map((note, idx) => (
+              <Link
+                key={note.id}
+                to={`/books/${note.bookId}`}
+                className="group relative p-4 rounded-xl bg-gradient-to-br from-coffee-50 to-brass-400/5 border border-coffee-100 hover:border-coffee-200 hover:shadow-md transition-all duration-200"
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <span className={cn(
+                    'w-6 h-6 rounded-md flex items-center justify-center font-serif font-bold text-xs flex-shrink-0',
+                    idx === 0 ? 'bg-gradient-to-br from-rose-400 to-rose-600 text-white' :
+                    idx === 1 ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-white' :
+                    idx === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-800 text-white' :
+                    'bg-coffee-200 text-coffee-600'
+                  )}>
+                    {idx + 1}
+                  </span>
+                  {note.bookCover && (
+                    <img src={note.bookCover} alt="" className="w-10 h-14 object-cover rounded shadow-sm" />
+                  )}
+                </div>
+                <h3 className="font-medium text-coffee-800 text-sm line-clamp-2 mb-2 group-hover:text-coffee-600 transition-colors">
+                  {note.title}
+                </h3>
+                <p className="text-xs text-coffee-500 line-clamp-2 mb-3">
+                  {note.content}
+                </p>
+                <div className="flex items-center justify-between text-[10px] text-coffee-400">
+                  <span className="truncate">{note.nickname}</span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="flex items-center gap-0.5">
+                      <Heart className="w-3 h-3" />
+                      {note.likeCount}
+                    </span>
+                    <span className="flex items-center gap-0.5">
+                      <MessageSquare className="w-3 h-3" />
+                      {note.commentCount}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card p-6">

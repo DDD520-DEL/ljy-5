@@ -18,6 +18,11 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Heart,
+  Eye,
+  PenLine,
+  Lock,
+  Globe,
 } from 'lucide-react'
 import { bookApi } from '@/lib/api'
 import {
@@ -31,9 +36,11 @@ import {
   getLevelProgress,
   donationReviewStatusLabel,
   donationReviewStatusColor,
+  noteVisibilityLabel,
+  noteVisibilityColor,
   cn,
 } from '@/lib/utils'
-import type { ReaderProfile as ReaderProfileType, Review, PointsLog, DonationReview } from '../../shared/types'
+import type { ReaderProfile as ReaderProfileType, Review, PointsLog, DonationReview, Note } from '../../shared/types'
 
 export default function ReaderProfile() {
   const { nickname } = useParams<{ nickname: string }>()
@@ -41,7 +48,7 @@ export default function ReaderProfile() {
   const [profile, setProfile] = useState<ReaderProfileType | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'history' | 'borrow' | 'reviews' | 'meetups' | 'donations'>('history')
+  const [activeTab, setActiveTab] = useState<'history' | 'borrow' | 'reviews' | 'notes' | 'meetups' | 'donations'>('history')
 
   const loadProfile = useCallback(async () => {
     try {
@@ -100,7 +107,7 @@ export default function ReaderProfile() {
     )
   }
 
-  const { account, logs, borrowHistory, reviews, meetups, donations, donationReviews } = profile
+  const { account, logs, borrowHistory, reviews, notes, meetups, donations, donationReviews } = profile
   const levelProgress = getLevelProgress(account.points)
 
   const stats = [
@@ -115,6 +122,7 @@ export default function ReaderProfile() {
     { id: 'history', label: '积分动态', icon: TrendingUp, count: logs.length },
     { id: 'borrow', label: '借阅历史', icon: BookOpen, count: borrowHistory.length },
     { id: 'reviews', label: '发表书评', icon: MessageSquare, count: reviews.length },
+    { id: 'notes', label: '读书笔记', icon: PenLine, count: notes.length },
     { id: 'meetups', label: '读书会', icon: Users, count: meetups.length },
     { id: 'donations', label: '捐赠图书', icon: Gift, count: donations.length + (donationReviews?.length || 0) },
   ] as const
@@ -363,6 +371,70 @@ export default function ReaderProfile() {
                         <p className="text-xs text-coffee-500 group-hover:text-coffee-700 transition-colors">
                           查看图书 →
                         </p>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'notes' && (
+                <div className="space-y-3">
+                  {notes.length === 0 ? (
+                    <div className="text-center py-12">
+                      <PenLine className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+                      <p className="text-coffee-400">暂无读书笔记</p>
+                    </div>
+                  ) : (
+                    notes.map((note: Note) => (
+                      <Link
+                        key={note.id}
+                        to={`/books/${note.bookId}`}
+                        className="block p-4 rounded-xl bg-coffee-50/50 border border-coffee-100 hover:border-coffee-200 transition-colors group"
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-coffee-800 mb-1 group-hover:text-coffee-600 transition-colors">
+                              {note.title}
+                            </h4>
+                            {note.bookTitle && (
+                              <p className="text-xs text-coffee-500">{note.bookTitle}</p>
+                            )}
+                          </div>
+                          <span className={cn('badge border text-[10px] flex-shrink-0', noteVisibilityColor[note.visibility])}>
+                            {note.visibility === 'private' && <Lock className="w-3 h-3 mr-0.5" />}
+                            {note.visibility === 'public' && <Globe className="w-3 h-3 mr-0.5" />}
+                            {noteVisibilityLabel[note.visibility]}
+                          </span>
+                        </div>
+                        <p className="text-coffee-700 text-sm leading-relaxed line-clamp-3 mb-3">
+                          {note.content}
+                        </p>
+                        {note.images.length > 0 && (
+                          <div className="grid grid-cols-4 gap-1 mb-3">
+                            {note.images.slice(0, 4).map((img, idx) => (
+                              <div key={idx} className="aspect-square rounded overflow-hidden bg-coffee-100">
+                                <img src={img} alt={`配图${idx + 1}`} className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 text-xs text-coffee-500">
+                            <span className="flex items-center gap-1">
+                              <Heart className="w-3 h-3" />
+                              {note.likeCount}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <MessageSquare className="w-3 h-3" />
+                              {note.commentCount}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Eye className="w-3 h-3" />
+                              {note.viewCount}
+                            </span>
+                          </div>
+                          <span className="text-xs text-coffee-400">{formatDateTime(note.createdAt)}</span>
+                        </div>
                       </Link>
                     ))
                   )}

@@ -21,8 +21,15 @@ import {
   Users,
   Bell,
   AlertCircle,
+  Heart,
+  ImagePlus,
+  ChevronDown,
+  ChevronUp,
+  PenLine,
+  Lock,
+  Globe,
 } from 'lucide-react'
-import { bookApi, reservationApi } from '@/lib/api'
+import { bookApi, reservationApi, noteApi } from '@/lib/api'
 import {
   formatDateTime,
   sourceTypeLabel,
@@ -30,9 +37,11 @@ import {
   renderStars,
   readerLevelLabel,
   readerLevelColor,
+  noteVisibilityLabel,
+  noteVisibilityColor,
   cn,
 } from '@/lib/utils'
-import type { Book as BookType, TraceLog, Review, Reservation, ReviewWithLevel } from '../../shared/types'
+import type { Book as BookType, TraceLog, Review, Reservation, ReviewWithLevel, Note, NoteComment, NoteVisibility } from '../../shared/types'
 
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>()
@@ -69,19 +78,38 @@ export default function BookDetail() {
   const [returnSuccess, setReturnSuccess] = useState(false)
   const [notifiedName, setNotifiedName] = useState<string | null>(null)
 
+  const [detailTab, setDetailTab] = useState<'trace' | 'notes'>('trace')
+  const [notes, setNotes] = useState<Note[]>([])
+  const [showNoteEditor, setShowNoteEditor] = useState(false)
+  const [noteTitle, setNoteTitle] = useState('')
+  const [noteContent, setNoteContent] = useState('')
+  const [noteImages, setNoteImages] = useState<string[]>([])
+  const [noteVisibility, setNoteVisibility] = useState<NoteVisibility>('public')
+  const [noteNickname, setNoteNickname] = useState('')
+  const [submittingNote, setSubmittingNote] = useState(false)
+  const [noteSuccess, setNoteSuccess] = useState(false)
+  const [expandedNote, setExpandedNote] = useState<number | null>(null)
+  const [noteComments, setNoteComments] = useState<Record<number, NoteComment[]>>({})
+  const [commentInputs, setCommentInputs] = useState<Record<number, string>>({})
+  const [commentNicknames, setCommentNicknames] = useState<Record<number, string>>({})
+  const [submittingComments, setSubmittingComments] = useState<Record<number, boolean>>({})
+  const [likedNotes, setLikedNotes] = useState<Record<number, boolean>>({})
+  const [likingNotes, setLikingNotes] = useState<Record<number, boolean>>({})
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
       const bookId = Number(id)
 
-      const [bookData, traceData, reviewsData, qrcodeDataResult, statusData, reservationsData] = await Promise.all([
+      const [bookData, traceData, reviewsData, qrcodeDataResult, statusData, reservationsData, notesData] = await Promise.all([
         bookApi.get(bookId),
         bookApi.trace(bookId),
         bookApi.reviews(bookId),
         bookApi.qrcode(bookId),
         bookApi.status(bookId),
         reservationApi.listByBook(bookId),
+        noteApi.listByBook(bookId),
       ])
 
       setBook(bookData)
@@ -90,6 +118,7 @@ export default function BookDetail() {
       setQrcodeData(qrcodeDataResult)
       setIsBorrowed(statusData.borrowed)
       setReservations(reservationsData)
+      setNotes(notesData)
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
     } finally {
@@ -214,6 +243,100 @@ export default function BookDetail() {
     } finally {
       setSubmittingReservation(false)
     }
+  }
+
+  async function handleSubmitNote(e: React.FormEvent) {
+    e.preventDefault()
+    if (!book || !noteNickname.trim() || !noteTitle.trim() || !noteContent.trim()) return
+
+    try {
+      setSubmittingNote(true)
+      await noteApi.create({
+        bookId: book.id,
+        nickname: noteNickname.trim(),
+        title: noteTitle.trim(),
+        content: noteContent.trim(),
+        images: noteImages,
+        visibility: noteVisibility,
+      })
+      setNoteSuccess(true)
+      setNoteTitle('')
+      setNoteContent('')
+      setNoteImages([])
+      setShowNoteEditor(false)
+      setTimeout(() => setNoteSuccess(false), 3000)
+      const notesData = await noteApi.listByBook(book.id, noteNickname.trim())
+      setNotes(notesData)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '发布失败')
+    } finally {
+      setSubmittingNote(false)
+    }
+  }
+
+  async function handleToggleLike(noteId: number, nickname: string) {
+    if (!nickname.trim()) {
+      alert('请先输入昵称')
+      return
+    }
+    try {
+      setLikingNotes(prev => ({ ...prev, [noteId]: true }))
+      const result = await noteApi.like(noteId, nickname.trim())
+      setLikedNotes(prev => ({ ...prev, [noteId]: result.liked }))
+      setNotes(prev => prev.map(n => n.id === noteId ? result.note : n))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '操作失败')
+    } finally {
+      setLikingNotes(prev => ({ ...prev, [noteId]: false }))
+    }
+  }
+
+  async function handleLoadComments(noteId: number) {
+    if (noteComments[noteId]) {
+      setExpandedNote(expandedNote === noteId ? null : noteId)
+      return
+    }
+    try {
+      const comments = await noteApi.getComments(noteId)
+      setNoteComments(prev => ({ ...prev, [noteId]: comments }))
+      setExpandedNote(noteId)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '加载评论失败')
+    }
+  }
+
+  async function handleAddComment(noteId: number) {
+    const nickname = commentNicknames[noteId] || ''
+    const content = commentInputs[noteId] || ''
+    if (!nickname.trim() || !content.trim()) {
+      alert('请填写昵称和评论内容')
+      return
+    }
+    try {
+      setSubmittingComments(prev => ({ ...prev, [noteId]: true }))
+      const result = await noteApi.addComment(noteId, {
+        nickname: nickname.trim(),
+        content: content.trim(),
+      })
+      setNoteComments(prev => ({ ...prev, [noteId]: [...(prev[noteId] || []), result.comment] }))
+      setNotes(prev => prev.map(n => n.id === noteId ? result.note : n))
+      setCommentInputs(prev => ({ ...prev, [noteId]: '' }))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '评论失败')
+    } finally {
+      setSubmittingComments(prev => ({ ...prev, [noteId]: false }))
+    }
+  }
+
+  function handleAddImage() {
+    const url = prompt('请输入图片URL:')
+    if (url && url.trim()) {
+      setNoteImages(prev => [...prev, url.trim()])
+    }
+  }
+
+  function handleRemoveImage(index: number) {
+    setNoteImages(prev => prev.filter((_, i) => i !== index))
   }
 
   if (loading) {
@@ -605,51 +728,401 @@ export default function BookDetail() {
 
         <div className="lg:col-span-5 space-y-6">
           <div className="card p-6">
-            <h3 className="section-title flex items-center gap-2 mb-6">
-              <Clock className="w-4 h-4" />
-              流转历史
-            </h3>
+            <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-2 border-b border-coffee-100">
+              <button
+                onClick={() => setDetailTab('trace')}
+                className={cn(
+                  'px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 whitespace-nowrap',
+                  detailTab === 'trace'
+                    ? 'bg-coffee-700 text-white shadow-md'
+                    : 'text-coffee-500 hover:text-coffee-700 hover:bg-coffee-50'
+                )}
+              >
+                <Clock className="w-4 h-4" />
+                流转历史
+              </button>
+              <button
+                onClick={() => setDetailTab('notes')}
+                className={cn(
+                  'px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 whitespace-nowrap',
+                  detailTab === 'notes'
+                    ? 'bg-coffee-700 text-white shadow-md'
+                    : 'text-coffee-500 hover:text-coffee-700 hover:bg-coffee-50'
+                )}
+              >
+                <PenLine className="w-4 h-4" />
+                读者笔记
+                {notes.filter(n => n.visibility === 'public').length > 0 && (
+                  <span className={cn(
+                    'px-1.5 py-0.5 rounded-full text-xs',
+                    detailTab === 'notes' ? 'bg-white/20' : 'bg-coffee-100'
+                  )}>
+                    {notes.filter(n => n.visibility === 'public').length}
+                  </span>
+                )}
+              </button>
+            </div>
 
-            {traceLogs.length === 0 ? (
-              <div className="text-center py-12">
-                <Clock className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
-                <p className="text-coffee-400">暂无流转记录</p>
-              </div>
-            ) : (
-              <div className="relative">
-                <div className="absolute left-5 top-2 bottom-2 w-0.5 bg-gradient-to-b from-coffee-300 via-coffee-200 to-coffee-100" />
-                <div className="space-y-6">
-                  {traceLogs.map((log, index) => (
-                    <div key={log.id} className="relative pl-14">
-                      <div className={cn(
-                        'absolute left-0 top-0 w-10 h-10 rounded-full flex items-center justify-center border-2',
-                        index === 0
-                          ? 'bg-coffee-700 border-coffee-700 text-white'
-                          : 'bg-white border-coffee-200 text-coffee-500'
-                      )}>
-                        <CheckCircle className="w-5 h-5" />
-                      </div>
-                      <div className="p-4 rounded-xl bg-coffee-50/50 border border-coffee-100 hover:border-coffee-200 transition-colors duration-200">
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <span className="badge bg-coffee-100 text-coffee-700 font-medium">
-                            {log.action}
-                          </span>
-                          <span className="text-xs text-coffee-400 flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {formatDateTime(log.timestamp)}
-                          </span>
+            {detailTab === 'trace' && (
+              <>
+                {traceLogs.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Clock className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+                    <p className="text-coffee-400">暂无流转记录</p>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="absolute left-5 top-2 bottom-2 w-0.5 bg-gradient-to-b from-coffee-300 via-coffee-200 to-coffee-100" />
+                    <div className="space-y-6">
+                      {traceLogs.map((log, index) => (
+                        <div key={log.id} className="relative pl-14">
+                          <div className={cn(
+                            'absolute left-0 top-0 w-10 h-10 rounded-full flex items-center justify-center border-2',
+                            index === 0
+                              ? 'bg-coffee-700 border-coffee-700 text-white'
+                              : 'bg-white border-coffee-200 text-coffee-500'
+                          )}>
+                            <CheckCircle className="w-5 h-5" />
+                          </div>
+                          <div className="p-4 rounded-xl bg-coffee-50/50 border border-coffee-100 hover:border-coffee-200 transition-colors duration-200">
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <span className="badge bg-coffee-100 text-coffee-700 font-medium">
+                                {log.action}
+                              </span>
+                              <span className="text-xs text-coffee-400 flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {formatDateTime(log.timestamp)}
+                              </span>
+                            </div>
+                            <p className="text-coffee-700 text-sm leading-relaxed">{log.description}</p>
+                            {log.operator && (
+                              <p className="text-xs text-coffee-500 mt-2 flex items-center gap-1">
+                                <User className="w-3 h-3" />
+                                操作人：{log.operator}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-coffee-700 text-sm leading-relaxed">{log.description}</p>
-                        {log.operator && (
-                          <p className="text-xs text-coffee-500 mt-2 flex items-center gap-1">
-                            <User className="w-3 h-3" />
-                            操作人：{log.operator}
-                          </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {detailTab === 'notes' && (
+              <div className="space-y-4">
+                {noteSuccess && (
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-forest-500/10 border border-forest-500/20">
+                    <div className="w-10 h-10 rounded-full bg-forest-500/10 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle className="w-5 h-5 text-forest-500" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-forest-600">发布成功！</p>
+                      <p className="text-sm text-forest-500/80">感谢您的分享</p>
+                    </div>
+                  </div>
+                )}
+
+                {!showNoteEditor ? (
+                  <button
+                    onClick={() => setShowNoteEditor(true)}
+                    className="w-full p-4 rounded-xl border-2 border-dashed border-coffee-200 hover:border-coffee-400 hover:bg-coffee-50/50 transition-all duration-200 text-coffee-500 hover:text-coffee-700"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <PenLine className="w-5 h-5" />
+                      <span className="font-medium">写读书笔记</span>
+                    </div>
+                  </button>
+                ) : (
+                  <form onSubmit={handleSubmitNote} className="space-y-4 p-4 rounded-xl bg-coffee-50/50 border border-coffee-100">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-coffee-800 flex items-center gap-2">
+                        <PenLine className="w-4 h-4" />
+                        写读书笔记
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setShowNoteEditor(false)}
+                        className="text-coffee-400 hover:text-coffee-600 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="label">昵称 <span className="text-red-500">*</span></label>
+                      <input
+                        type="text"
+                        value={noteNickname}
+                        onChange={(e) => setNoteNickname(e.target.value)}
+                        placeholder="请输入您的昵称"
+                        disabled={submittingNote}
+                        className={cn('input-field', submittingNote && 'opacity-50 cursor-not-allowed')}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="label">笔记标题 <span className="text-red-500">*</span></label>
+                      <input
+                        type="text"
+                        value={noteTitle}
+                        onChange={(e) => setNoteTitle(e.target.value)}
+                        placeholder="给您的笔记起个标题..."
+                        disabled={submittingNote}
+                        className={cn('input-field', submittingNote && 'opacity-50 cursor-not-allowed')}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="label">笔记内容 <span className="text-red-500">*</span></label>
+                      <textarea
+                        value={noteContent}
+                        onChange={(e) => setNoteContent(e.target.value)}
+                        placeholder="分享您的阅读感受、摘抄、感悟..."
+                        rows={6}
+                        disabled={submittingNote}
+                        className={cn('input-field resize-none', submittingNote && 'opacity-50 cursor-not-allowed')}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="label">配图</label>
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={handleAddImage}
+                          disabled={submittingNote}
+                          className={cn(
+                            'w-full p-3 rounded-lg border-2 border-dashed border-coffee-200 hover:border-coffee-400 hover:bg-coffee-50 transition-all text-coffee-500 hover:text-coffee-700 text-sm',
+                            submittingNote && 'opacity-50 cursor-not-allowed'
+                          )}
+                        >
+                          <ImagePlus className="w-4 h-4 inline mr-1" />
+                          添加图片URL
+                        </button>
+                        {noteImages.length > 0 && (
+                          <div className="grid grid-cols-3 gap-2">
+                            {noteImages.map((img, idx) => (
+                              <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-coffee-100">
+                                <img src={img} alt={`配图${idx + 1}`} className="w-full h-full object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveImage(idx)}
+                                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
                     </div>
-                  ))}
-                </div>
+
+                    <div>
+                      <label className="label">可见性</label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNoteVisibility('public')}
+                          className={cn(
+                            'flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 border',
+                            noteVisibility === 'public'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              : 'bg-white text-coffee-500 border-coffee-200 hover:border-coffee-300'
+                          )}
+                        >
+                          <Globe className="w-4 h-4" />
+                          公开
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNoteVisibility('private')}
+                          className={cn(
+                            'flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 border',
+                            noteVisibility === 'private'
+                              ? 'bg-coffee-100 text-coffee-700 border-coffee-300'
+                              : 'bg-white text-coffee-500 border-coffee-200 hover:border-coffee-300'
+                          )}
+                        >
+                          <Lock className="w-4 h-4" />
+                          私密
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submittingNote || !noteNickname.trim() || !noteTitle.trim() || !noteContent.trim()}
+                      className={cn(
+                        'btn-primary w-full inline-flex items-center justify-center gap-2',
+                        (submittingNote || !noteNickname.trim() || !noteTitle.trim() || !noteContent.trim()) && 'opacity-50 cursor-not-allowed hover:bg-coffee-700 hover:translate-y-0'
+                      )}
+                    >
+                      {submittingNote ? (
+                        <>发布中...</>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          发布笔记
+                        </>
+                      )}
+                    </button>
+                  </form>
+                )}
+
+                {notes.length === 0 ? (
+                  <div className="text-center py-12">
+                    <PenLine className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+                    <p className="text-coffee-400">暂无笔记，来写第一篇吧</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+                    {notes.map((note) => (
+                      <div
+                        key={note.id}
+                        className="p-4 rounded-xl bg-coffee-50/50 border border-coffee-100 hover:border-coffee-200 transition-all duration-200"
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div className="flex items-center gap-2.5">
+                            <Link to={`/readers/${encodeURIComponent(note.nickname)}`} className="w-8 h-8 rounded-full bg-gradient-to-br from-coffee-400 to-coffee-600 flex items-center justify-center flex-shrink-0 hover:opacity-80 transition-opacity">
+                              <span className="text-white text-sm font-medium">
+                                {note.nickname.charAt(0)}
+                              </span>
+                            </Link>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <Link to={`/readers/${encodeURIComponent(note.nickname)}`} className="text-sm font-medium text-coffee-800 hover:text-coffee-600 transition-colors">
+                                  {note.nickname}
+                                </Link>
+                              </div>
+                              <p className="text-xs text-coffee-400">{formatDateTime(note.createdAt)}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <span className={cn('badge border text-[10px]', noteVisibilityColor[note.visibility])}>
+                              {noteVisibilityLabel[note.visibility]}
+                            </span>
+                          </div>
+                        </div>
+
+                        <h4 className="font-medium text-coffee-800 mb-2">{note.title}</h4>
+                        <p className="text-coffee-700 text-sm leading-relaxed whitespace-pre-wrap line-clamp-3 mb-3">
+                          {note.content}
+                        </p>
+
+                        {note.images.length > 0 && (
+                          <div className="grid grid-cols-3 gap-2 mb-3">
+                            {note.images.slice(0, 3).map((img, idx) => (
+                              <div key={idx} className="aspect-square rounded-lg overflow-hidden bg-coffee-100">
+                                <img src={img} alt={`配图${idx + 1}`} className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                            {note.images.length > 3 && (
+                              <div className="aspect-square rounded-lg overflow-hidden bg-coffee-200 flex items-center justify-center">
+                                <span className="text-coffee-600 text-sm font-medium">+{note.images.length - 3}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-4 pt-2 border-t border-coffee-100">
+                          <button
+                            onClick={() => handleToggleLike(note.id, noteNickname || note.nickname)}
+                            disabled={likingNotes[note.id]}
+                            className={cn(
+                              'flex items-center gap-1 text-sm transition-colors',
+                              likedNotes[note.id]
+                                ? 'text-rose-500'
+                                : 'text-coffee-500 hover:text-rose-500'
+                            )}
+                          >
+                            <Heart className={cn('w-4 h-4', likedNotes[note.id] && 'fill-rose-500')} />
+                            <span>{note.likeCount}</span>
+                          </button>
+                          <button
+                            onClick={() => handleLoadComments(note.id)}
+                            className="flex items-center gap-1 text-sm text-coffee-500 hover:text-coffee-700 transition-colors"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            <span>{note.commentCount}</span>
+                            {expandedNote === note.id ? (
+                              <ChevronUp className="w-3 h-3" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3" />
+                            )}
+                          </button>
+                          <div className="flex items-center gap-1 text-xs text-coffee-400 ml-auto">
+                            <Eye className="w-3 h-3" />
+                            <span>{note.viewCount}</span>
+                          </div>
+                        </div>
+
+                        {expandedNote === note.id && noteComments[note.id] && (
+                          <div className="mt-4 pt-4 border-t border-coffee-100 space-y-3">
+                            <div className="space-y-2">
+                              {noteComments[note.id]!.map((comment) => (
+                                <div key={comment.id} className="flex gap-2">
+                                  <div className="w-7 h-7 rounded-full bg-coffee-200 flex items-center justify-center flex-shrink-0">
+                                    <span className="text-coffee-600 text-xs font-medium">
+                                      {comment.nickname.charAt(0)}
+                                    </span>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                      <span className="text-xs font-medium text-coffee-700">{comment.nickname}</span>
+                                      <span className="text-[10px] text-coffee-400">{formatDateTime(comment.createdAt)}</span>
+                                    </div>
+                                    <p className="text-sm text-coffee-600">{comment.content}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                              <input
+                                type="text"
+                                value={commentNicknames[note.id] || ''}
+                                onChange={(e) => setCommentNicknames(prev => ({ ...prev, [note.id]: e.target.value }))}
+                                placeholder="昵称"
+                                disabled={submittingComments[note.id]}
+                                className={cn('input-field flex-1 text-sm py-2', submittingComments[note.id] && 'opacity-50 cursor-not-allowed')}
+                              />
+                              <input
+                                type="text"
+                                value={commentInputs[note.id] || ''}
+                                onChange={(e) => setCommentInputs(prev => ({ ...prev, [note.id]: e.target.value }))}
+                                placeholder="说点什么..."
+                                disabled={submittingComments[note.id]}
+                                className={cn('input-field flex-[2] text-sm py-2', submittingComments[note.id] && 'opacity-50 cursor-not-allowed')}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    handleAddComment(note.id)
+                                  }
+                                }}
+                              />
+                              <button
+                                onClick={() => handleAddComment(note.id)}
+                                disabled={submittingComments[note.id]}
+                                className={cn(
+                                  'px-3 py-2 rounded-lg bg-coffee-700 text-white text-sm hover:bg-coffee-800 transition-colors',
+                                  submittingComments[note.id] && 'opacity-50 cursor-not-allowed'
+                                )}
+                              >
+                                发送
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

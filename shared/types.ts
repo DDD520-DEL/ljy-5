@@ -230,6 +230,58 @@ export interface ReaderRanking {
   borrowCount: number
 }
 
+export type NoteVisibility = 'public' | 'private'
+
+export interface Note {
+  id: number
+  bookId: number
+  bookTitle?: string
+  bookCover?: string
+  nickname: string
+  title: string
+  content: string
+  images: string[]
+  visibility: NoteVisibility
+  likeCount: number
+  commentCount: number
+  viewCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface NoteComment {
+  id: number
+  noteId: number
+  nickname: string
+  content: string
+  createdAt: string
+}
+
+export interface NoteLike {
+  id: number
+  noteId: number
+  nickname: string
+  createdAt: string
+}
+
+export interface NoteWithBook extends Note {
+  book?: Book
+}
+
+export interface CreateNoteRequest {
+  bookId: number
+  nickname: string
+  title: string
+  content: string
+  images?: string[]
+  visibility: NoteVisibility
+}
+
+export interface CreateNoteCommentRequest {
+  nickname: string
+  content: string
+}
+
 export interface ReaderProfile {
   account: PointsAccount
   logs: PointsLog[]
@@ -238,4 +290,5 @@ export interface ReaderProfile {
   meetups: { meetup: Meetup; registration: Registration }[]
   donations: Book[]
   donationReviews: DonationReview[]
+  notes: Note[]
 }

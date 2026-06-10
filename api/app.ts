@@ -14,6 +14,7 @@ import meetupsRoutes from './routes/meetups.js'
 import traceRoutes from './routes/trace.js'
 import reservationsRoutes from './routes/reservations.js'
 import donationsRoutes from './routes/donations.js'
+import notesRoutes from './routes/notes.js'
 
 // load env
 dotenv.config()
@@ -32,6 +33,7 @@ app.use('/api/meetups', meetupsRoutes)
 app.use('/api/trace', traceRoutes)
 app.use('/api/reservations', reservationsRoutes)
 app.use('/api/donations', donationsRoutes)
+app.use('/api/notes', notesRoutes)
 
 /**
  * health

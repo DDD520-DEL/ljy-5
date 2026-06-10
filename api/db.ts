@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -220,6 +220,147 @@ const initialPointsLogs: PointsLog[] = [
   { id: 9, accountId: 5, nickname: '小王子的玫瑰', action: 'meetup', points: 10, description: '参加《百年孤独》共读之夜', relatedId: 1, createdAt: '2026-06-02T11:00:00.000Z' },
 ]
 
+const initialNotes: Note[] = [
+  {
+    id: 1,
+    bookId: 1,
+    bookTitle: '百年孤独',
+    bookCover: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=book%20cover%20hundred%20years%20of%20solitude%20magical%20realism%20latin%20america&image_size=portrait_4_3',
+    nickname: '爱读书的猫',
+    title: '布恩迪亚家族的宿命轮回',
+    content: '读完《百年孤独》已经是第三遍了，每次都有不同的感受。马尔克斯用魔幻现实主义的笔法，描绘了布恩迪亚家族七代人的兴衰。\n\n最让我震撼的是乌尔苏拉这位女性，她是整个家族的支柱，活了很久很久，见证了家族的每一次兴衰。她的坚韧和生命力让人敬佩。\n\n书中那句"生命中曾经有过的所有灿烂，原来终究都需要用寂寞来偿还"，读来令人唏嘘。孤独是这个家族的宿命，也是每个人生命中难以回避的主题。',
+    images: [
+      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=magical%20realism%20butterflies%20yellow%20flying%20vintage%20warm%20light&image_size=landscape_4_3',
+    ],
+    visibility: 'public',
+    likeCount: 12,
+    commentCount: 3,
+    viewCount: 86,
+    createdAt: '2026-05-20T19:30:00.000Z',
+    updatedAt: '2026-05-20T19:30:00.000Z',
+  },
+  {
+    id: 2,
+    bookId: 1,
+    bookTitle: '百年孤独',
+    bookCover: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=book%20cover%20hundred%20years%20of%20solitude%20magical%20realism%20latin%20america&image_size=portrait_4_3',
+    nickname: '夜读者',
+    title: '关于孤独的随想',
+    content: '在书店的角落读完了这本书，窗外下着雨，配合书中的氛围，别有一番滋味。\n\n马尔克斯笔下的马孔多小镇，像是一个微缩的世界。从最初的荒凉到后来的繁荣，再到最终的消失，一切都像是一场梦。\n\n每个人物都有自己的孤独：奥雷里亚诺上校在战争中迷失，阿玛兰妲在爱情与悔恨中挣扎，丽贝卡在墙中度过余生...\n\n也许孤独不是一种惩罚，而是生命的本质。接受孤独，才能真正理解生活。',
+    images: [
+      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=rainy%20window%20bookstore%20cozy%20warm%20lamp%20reading%20atmosphere&image_size=landscape_4_3',
+      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=old%20town%20nostalgic%20latin%20american%20sunset%20peaceful&image_size=landscape_4_3',
+    ],
+    visibility: 'public',
+    likeCount: 8,
+    commentCount: 2,
+    viewCount: 54,
+    createdAt: '2026-06-01T22:15:00.000Z',
+    updatedAt: '2026-06-01T22:15:00.000Z',
+  },
+  {
+    id: 3,
+    bookId: 2,
+    bookTitle: '小王子',
+    bookCover: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=little%20prince%20book%20cover%20starry%20night%20rose%20fox%20illustration&image_size=portrait_4_3',
+    nickname: '小王子的玫瑰',
+    title: '献给每个曾经是孩子的大人',
+    content: '"所有大人都曾经是孩子，虽然很少有人记得这件事。"\n\n每次读《小王子》，都会被这句话击中。我们在成长的过程中，渐渐忘记了曾经的自己，变得只关心数字和"正经事"。\n\n小王子说："真正重要的东西，用眼睛是看不见的。" 爱、友谊、梦想...这些最珍贵的东西，都需要用心去感受。\n\n那朵骄傲的玫瑰，那只等待被驯服的狐狸，那颗会熄灭的星球...每个角色都有它的意义。\n\n希望我们都能保持一颗童心，记得看日落时的感动，记得为一朵玫瑰付出的时光。',
+    images: [
+      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=little%20prince%20starry%20night%20illustration%20dreamy%20magical&image_size=landscape_4_3',
+    ],
+    visibility: 'public',
+    likeCount: 15,
+    commentCount: 5,
+    viewCount: 102,
+    createdAt: '2026-05-15T14:00:00.000Z',
+    updatedAt: '2026-05-15T14:00:00.000Z',
+  },
+  {
+    id: 4,
+    bookId: 5,
+    bookTitle: '活着',
+    bookCover: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=to%20live%20yu%20hua%20book%20cover%20chinese%20rural%20life%20sepia%20tone&image_size=portrait_4_3',
+    nickname: '文字的力量',
+    title: '活着本身就是意义',
+    content: '余华的文字像一把钝刀，慢慢割着你的心，却又让你欲罢不能。\n\n福贵的一生经历了太多的苦难：家道中落、失去亲人、战乱饥荒...到最后只剩他和一头老牛相依为命。\n\n但即使在最黑暗的时候，福贵也没有放弃活下去的希望。他说："人是为活着本身而活着，而不是为了活着之外的任何事物而活着。"\n\n读完这本书，我重新思考了生命的意义。我们常常为了名利奔波，却忘记了最朴素的道理——活着，本身就是最大的幸福。',
+    images: [
+      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=old%20chinese%20village%20sunset%20farmer%20water%20buffalo%20peaceful%20rural&image_size=landscape_4_3',
+    ],
+    visibility: 'public',
+    likeCount: 10,
+    commentCount: 4,
+    viewCount: 78,
+    createdAt: '2026-06-05T20:45:00.000Z',
+    updatedAt: '2026-06-05T20:45:00.000Z',
+  },
+  {
+    id: 5,
+    bookId: 3,
+    bookTitle: '追风筝的人',
+    bookCover: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=kite%20runner%20book%20cover%20afghanistan%20kite%20sky%20warm%20colors&image_size=portrait_4_3',
+    nickname: '追风筝的人',
+    title: '为你，千千万万遍',
+    content: '这句话在书中出现了很多次，每次都让我热泪盈眶。\n\n阿米尔和哈桑的故事，关于友谊、背叛和救赎。每个人的生命中也许都有一只追不到的风筝，都有一个想弥补却无法弥补的遗憾。\n\n但重要的是，我们还有机会去寻找救赎的道路。阿米尔最终鼓起勇气回到阿富汗，去寻找哈桑的儿子，也是在寻找内心的平静。\n\n也许我们无法改变过去，但我们可以选择如何面对未来。愿每个人都能追到属于自己的那只风筝。',
+    images: [],
+    visibility: 'public',
+    likeCount: 7,
+    commentCount: 1,
+    viewCount: 45,
+    createdAt: '2026-06-08T16:20:00.000Z',
+    updatedAt: '2026-06-08T16:20:00.000Z',
+  },
+  {
+    id: 6,
+    bookId: 1,
+    bookTitle: '百年孤独',
+    bookCover: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=book%20cover%20hundred%20years%20of%20solitude%20magical%20realism%20latin%20america&image_size=portrait_4_3',
+    nickname: '书虫阿明',
+    title: '读书笔记（私密）',
+    content: '这是我的私人读书笔记，记录一些个人感想...\n\n第一章的开头那句"多年以后，面对行刑队，奥雷里亚诺·布恩迪亚上校将会回想起父亲带他去见识冰块的那个遥远的下午"，真的是神来之笔。\n\n时间的循环、命运的轮回，在这句话里就已经铺垫好了。\n\n待续...',
+    images: [],
+    visibility: 'private',
+    likeCount: 0,
+    commentCount: 0,
+    viewCount: 0,
+    createdAt: '2026-06-03T11:00:00.000Z',
+    updatedAt: '2026-06-03T11:00:00.000Z',
+  },
+]
+
+const initialNoteComments: NoteComment[] = [
+  { id: 1, noteId: 1, nickname: '夜读者', content: '写得太好了！乌尔苏拉确实是全书最有力量的女性角色。', createdAt: '2026-05-21T08:30:00.000Z' },
+  { id: 2, noteId: 1, nickname: '小王子的玫瑰', content: '马尔克斯的文字真的有魔法，每次读都有新的感悟。', createdAt: '2026-05-22T15:45:00.000Z' },
+  { id: 3, noteId: 1, nickname: '追风筝的人', content: '最喜欢的就是那段关于寂寞的描述，太戳心了。', createdAt: '2026-05-25T10:20:00.000Z' },
+  { id: 4, noteId: 2, nickname: '爱读书的猫', content: '雨夜读书，想想就很有氛围啊！', createdAt: '2026-06-02T09:15:00.000Z' },
+  { id: 5, noteId: 2, nickname: '文字的力量', content: '马孔多的兴衰，像是整个人类文明的缩影。', createdAt: '2026-06-03T14:30:00.000Z' },
+  { id: 6, noteId: 3, nickname: '不想长大', content: '这本书真的是写给大人的童话，每次读都想哭。', createdAt: '2026-05-16T12:00:00.000Z' },
+  { id: 7, noteId: 3, nickname: '爱读书的猫', content: '"用心去看才能看得清楚"，这句话我也很喜欢！', createdAt: '2026-05-17T18:20:00.000Z' },
+  { id: 8, noteId: 3, nickname: '书虫阿明', content: '狐狸和小王子的那段对话，每次看都很感动。', createdAt: '2026-05-18T09:45:00.000Z' },
+  { id: 9, noteId: 3, nickname: '夜读者', content: '保持童心，是我们能送给自己最好的礼物。', createdAt: '2026-05-20T21:10:00.000Z' },
+  { id: 10, noteId: 3, nickname: '平凡的人', content: '谢谢分享，让我想再读一遍小王子了。', createdAt: '2026-05-22T16:30:00.000Z' },
+  { id: 11, noteId: 4, nickname: '平凡的人', content: '余华的书总是让人又爱又怕，太虐了但又放不下。', createdAt: '2026-06-06T08:00:00.000Z' },
+  { id: 12, noteId: 4, nickname: '爱读书的猫', content: '"活着本身就是意义"，说得太好了。', createdAt: '2026-06-07T10:25:00.000Z' },
+  { id: 13, noteId: 4, nickname: '书虫阿明', content: '读完《活着》那段时间，我特别珍惜每一天。', createdAt: '2026-06-07T19:40:00.000Z' },
+  { id: 14, noteId: 4, nickname: '小王子的玫瑰', content: '福贵的 resilience（韧性）真的让人敬佩。', createdAt: '2026-06-08T12:15:00.000Z' },
+  { id: 15, noteId: 5, nickname: '文字的力量', content: '为你，千千万万遍。这句话也让我印象很深。', createdAt: '2026-06-09T11:30:00.000Z' },
+]
+
+const initialNoteLikes: NoteLike[] = [
+  { id: 1, noteId: 1, nickname: '夜读者', createdAt: '2026-05-21T08:00:00.000Z' },
+  { id: 2, noteId: 1, nickname: '小王子的玫瑰', createdAt: '2026-05-21T14:30:00.000Z' },
+  { id: 3, noteId: 1, nickname: '追风筝的人', createdAt: '2026-05-22T10:15:00.000Z' },
+  { id: 4, noteId: 1, nickname: '文字的力量', createdAt: '2026-05-23T16:45:00.000Z' },
+  { id: 5, noteId: 1, nickname: '书虫阿明', createdAt: '2026-05-24T09:20:00.000Z' },
+  { id: 6, noteId: 1, nickname: '不想长大', createdAt: '2026-05-25T11:00:00.000Z' },
+  { id: 7, noteId: 1, nickname: '平凡的人', createdAt: '2026-05-26T13:30:00.000Z' },
+  { id: 8, noteId: 1, nickname: '童话少女', createdAt: '2026-05-27T15:45:00.000Z' },
+  { id: 9, noteId: 1, nickname: '读书人小刘', createdAt: '2026-05-28T17:20:00.000Z' },
+  { id: 10, noteId: 1, nickname: '文学爱好者', createdAt: '2026-05-29T08:10:00.000Z' },
+  { id: 11, noteId: 1, nickname: '书虫阿明', createdAt: '2026-05-30T10:00:00.000Z' },
+  { id: 12, noteId: 1, nickname: '夜读者', createdAt: '2026-05-31T12:30:00.000Z' },
+]
+
 export interface Database {
   books: Book[]
   traceLogs: TraceLog[]
@@ -230,6 +371,9 @@ export interface Database {
   pointsAccounts: PointsAccount[]
   pointsLogs: PointsLog[]
   donationReviews: DonationReview[]
+  notes: Note[]
+  noteComments: NoteComment[]
+  noteLikes: NoteLike[]
   nextBookId: number
   nextTraceLogId: number
   nextReviewId: number
@@ -239,6 +383,9 @@ export interface Database {
   nextPointsAccountId: number
   nextPointsLogId: number
   nextDonationReviewId: number
+  nextNoteId: number
+  nextNoteCommentId: number
+  nextNoteLikeId: number
 }
 
 const initialDB: Database = {
@@ -251,6 +398,9 @@ const initialDB: Database = {
   pointsAccounts: initialPointsAccounts,
   pointsLogs: initialPointsLogs,
   donationReviews: [],
+  notes: initialNotes,
+  noteComments: initialNoteComments,
+  noteLikes: initialNoteLikes,
   nextBookId: 6,
   nextTraceLogId: 9,
   nextReviewId: 9,
@@ -259,7 +409,10 @@ const initialDB: Database = {
   nextReservationId: 4,
   nextPointsAccountId: 12,
   nextPointsLogId: 10,
-  nextDonationReviewId: 1
+  nextDonationReviewId: 1,
+  nextNoteId: 7,
+  nextNoteCommentId: 16,
+  nextNoteLikeId: 13,
 }
 
 let db: Database = initialDB
@@ -269,10 +422,21 @@ function loadDB(): Database {
   if (fs.existsSync(DATA_FILE)) {
     try {
       const raw = fs.readFileSync(DATA_FILE, 'utf-8')
-      const parsed = JSON.parse(raw)
+      const parsed = JSON.parse(raw) as Partial<Database>
+      
+      if (!parsed.notes) {
+        parsed.notes = initialNotes
+        parsed.noteComments = initialNoteComments
+        parsed.noteLikes = initialNoteLikes
+        parsed.nextNoteId = 7
+        parsed.nextNoteCommentId = 16
+        parsed.nextNoteLikeId = 13
+        saveDB(parsed as Database)
+      }
+      
       console.log(`[DB] 已从 ${DATA_FILE} 加载数据`)
-      console.log(`[DB] 图书: ${parsed.books.length} 本 | 读书会: ${parsed.meetups.length} 个 | 短评: ${parsed.reviews.length} 条`)
-      return parsed
+      console.log(`[DB] 图书: ${parsed.books?.length || 0} 本 | 读书会: ${parsed.meetups?.length || 0} 个 | 短评: ${parsed.reviews?.length || 0} 条 | 笔记: ${parsed.notes?.length || 0} 条`)
+      return parsed as Database
     } catch (err) {
       console.error('[DB] 数据文件读取失败，使用初始数据:', err)
       return { ...initialDB }
@@ -730,6 +894,10 @@ export function getReaderProfile(nickname: string): ReaderProfile | null {
 
   const donationReviews = getDonationReviewsByDonor(nickname)
 
+  const notes = db.notes
+    .filter(n => n.nickname === nickname)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
   return {
     account,
     logs,
@@ -738,6 +906,7 @@ export function getReaderProfile(nickname: string): ReaderProfile | null {
     meetups,
     donations,
     donationReviews,
+    notes,
   }
 }
 
@@ -847,4 +1016,172 @@ export function rejectDonationReview(id: number, reviewNote: string, reviewer?: 
   persistDB()
   console.log(`[DonationReview] 捐赠审核驳回: ${review.title} (原因: ${reviewNote})`)
   return review
+}
+
+export function createNote(data: CreateNoteRequest): { note: Note; pointsResult?: ReturnType<typeof addPoints> } {
+  const book = db.books.find(b => b.id === data.bookId)
+  const now = new Date().toISOString()
+  
+  const note: Note = {
+    id: db.nextNoteId++,
+    bookId: data.bookId,
+    bookTitle: book?.title,
+    bookCover: book?.coverImage,
+    nickname: data.nickname,
+    title: data.title,
+    content: data.content,
+    images: data.images || [],
+    visibility: data.visibility,
+    likeCount: 0,
+    commentCount: 0,
+    viewCount: 0,
+    createdAt: now,
+    updatedAt: now,
+  }
+  
+  db.notes.push(note)
+  
+  let pointsResult
+  if (data.visibility === 'public') {
+    pointsResult = addPoints(
+      data.nickname,
+      'review',
+      `发表《${book?.title || '图书'}》读书笔记`,
+      note.id
+    )
+  }
+  
+  persistDB()
+  console.log(`[Note] 新笔记: ${note.title} (作者: ${note.nickname})`)
+  return { note, pointsResult }
+}
+
+export function getNoteById(id: number): Note | null {
+  return db.notes.find(n => n.id === id) || null
+}
+
+export function getNotesByBook(bookId: number, includePrivate: boolean = false): Note[] {
+  let notes = db.notes.filter(n => n.bookId === bookId)
+  if (!includePrivate) {
+    notes = notes.filter(n => n.visibility === 'public')
+  }
+  return notes.sort((a, b) => {
+    const hotA = a.likeCount * 3 + a.commentCount * 2 + a.viewCount
+    const hotB = b.likeCount * 3 + b.commentCount * 2 + b.viewCount
+    return hotB - hotA
+  })
+}
+
+export function getNotesByUser(nickname: string): Note[] {
+  return db.notes
+    .filter(n => n.nickname === nickname)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+export function getHotNotes(limit: number = 10, days?: number): Note[] {
+  let notes = db.notes.filter(n => n.visibility === 'public')
+  
+  if (days) {
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - days)
+    notes = notes.filter(n => new Date(n.createdAt) >= cutoff)
+  }
+  
+  return notes
+    .sort((a, b) => {
+      const hotA = a.likeCount * 3 + a.commentCount * 2 + a.viewCount
+      const hotB = b.likeCount * 3 + b.commentCount * 2 + b.viewCount
+      return hotB - hotA
+    })
+    .slice(0, limit)
+}
+
+export function incrementNoteView(id: number): Note | null {
+  const note = db.notes.find(n => n.id === id)
+  if (!note) return null
+  note.viewCount++
+  persistDB()
+  return note
+}
+
+export function toggleNoteLike(noteId: number, nickname: string): { note: Note; liked: boolean } | null {
+  const note = db.notes.find(n => n.id === noteId)
+  if (!note) return null
+  
+  const existingLike = db.noteLikes.find(l => l.noteId === noteId && l.nickname === nickname)
+  
+  if (existingLike) {
+    db.noteLikes = db.noteLikes.filter(l => l.id !== existingLike.id)
+    note.likeCount = Math.max(0, note.likeCount - 1)
+    persistDB()
+    return { note, liked: false }
+  } else {
+    const like: NoteLike = {
+      id: db.nextNoteLikeId++,
+      noteId,
+      nickname,
+      createdAt: new Date().toISOString(),
+    }
+    db.noteLikes.push(like)
+    note.likeCount++
+    persistDB()
+    return { note, liked: true }
+  }
+}
+
+export function hasLikedNote(noteId: number, nickname: string): boolean {
+  return db.noteLikes.some(l => l.noteId === noteId && l.nickname === nickname)
+}
+
+export function getNoteComments(noteId: number): NoteComment[] {
+  return db.noteComments
+    .filter(c => c.noteId === noteId)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+}
+
+export function addNoteComment(noteId: number, data: { nickname: string; content: string }): { comment: NoteComment; note: Note } | null {
+  const note = db.notes.find(n => n.id === noteId)
+  if (!note) return null
+  
+  const comment: NoteComment = {
+    id: db.nextNoteCommentId++,
+    noteId,
+    nickname: data.nickname,
+    content: data.content,
+    createdAt: new Date().toISOString(),
+  }
+  
+  db.noteComments.push(comment)
+  note.commentCount++
+  
+  persistDB()
+  console.log(`[NoteComment] 新评论: 笔记ID ${noteId} (评论者: ${data.nickname})`)
+  return { comment, note }
+}
+
+export function updateNote(id: number, data: Partial<Pick<Note, 'title' | 'content' | 'images' | 'visibility'>>): Note | null {
+  const note = db.notes.find(n => n.id === id)
+  if (!note) return null
+  
+  if (data.title !== undefined) note.title = data.title
+  if (data.content !== undefined) note.content = data.content
+  if (data.images !== undefined) note.images = data.images
+  if (data.visibility !== undefined) note.visibility = data.visibility
+  note.updatedAt = new Date().toISOString()
+  
+  persistDB()
+  return note
+}
+
+export function deleteNote(id: number): boolean {
+  const index = db.notes.findIndex(n => n.id === id)
+  if (index === -1) return false
+  
+  db.notes.splice(index, 1)
+  db.noteComments = db.noteComments.filter(c => c.noteId !== id)
+  db.noteLikes = db.noteLikes.filter(l => l.noteId !== id)
+  
+  persistDB()
+  console.log(`[Note] 删除笔记: ID ${id}`)
+  return true
 }
