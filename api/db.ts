@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat, Bookshelf, BookshelfBook, BookshelfLike, BookshelfVisibility, CreateBookshelfRequest, UpdateBookshelfRequest, BookshelfWithBooks, BookshelfWithOwner, RatingStats, Feedback, FeedbackType, FeedbackStatus, CreateFeedbackRequest, UpdateFeedbackStatusRequest, MonthlyStar, MonthlyStarsResult, StarType } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat, Bookshelf, BookshelfBook, BookshelfLike, BookshelfVisibility, CreateBookshelfRequest, UpdateBookshelfRequest, BookshelfWithBooks, BookshelfWithOwner, RatingStats, Feedback, FeedbackType, FeedbackStatus, CreateFeedbackRequest, UpdateFeedbackStatusRequest, MonthlyStar, MonthlyStarsResult, StarType, ReadingCheckIn, CreateReadingCheckInRequest, ReadingCheckInStats, ReadingCheckInHeatmapData } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -391,6 +391,7 @@ export interface Database {
   bookshelfLikes: BookshelfLike[]
   feedbacks: Feedback[]
   monthlyStars: MonthlyStar[]
+  readingCheckIns: ReadingCheckIn[]
   nextBookId: number
   nextTraceLogId: number
   nextReviewId: number
@@ -415,6 +416,7 @@ export interface Database {
   nextBookshelfLikeId: number
   nextFeedbackId: number
   nextMonthlyStarId: number
+  nextReadingCheckInId: number
 }
 
 const initialCheckIns: CheckIn[] = [
@@ -631,6 +633,17 @@ const initialMonthlyStars: MonthlyStar[] = [
   { id: 10, year: 2026, month: 5, type: 'review', nickname: '追风筝的人', count: 1, rank: 5, createdAt: '2026-06-01T00:00:00.000Z' },
 ]
 
+const initialReadingCheckIns: ReadingCheckIn[] = [
+  { id: 1, nickname: '爱读书的猫', bookTitle: '百年孤独', bookAuthor: '加西亚·马尔克斯', bookCover: initialBooks[0].coverImage, durationMinutes: 60, thoughts: '今天读完了第三章，布恩迪亚家族的故事越来越精彩了。', checkInDate: daysAgo(5).split('T')[0], createdAt: daysAgo(5) },
+  { id: 2, nickname: '爱读书的猫', bookTitle: '百年孤独', bookAuthor: '加西亚·马尔克斯', bookCover: initialBooks[0].coverImage, durationMinutes: 45, thoughts: '乌尔苏拉真的是整个家族的支柱。', checkInDate: daysAgo(4).split('T')[0], createdAt: daysAgo(4) },
+  { id: 3, nickname: '爱读书的猫', bookTitle: '百年孤独', bookAuthor: '加西亚·马尔克斯', bookCover: initialBooks[0].coverImage, durationMinutes: 50, thoughts: '奥雷里亚诺上校的战争让人唏嘘。', checkInDate: daysAgo(3).split('T')[0], createdAt: daysAgo(3) },
+  { id: 4, nickname: '爱读书的猫', bookTitle: '百年孤独', bookAuthor: '加西亚·马尔克斯', bookCover: initialBooks[0].coverImage, durationMinutes: 55, thoughts: '继续深入阅读，感受魔幻现实主义的魅力。', checkInDate: daysAgo(2).split('T')[0], createdAt: daysAgo(2) },
+  { id: 5, nickname: '爱读书的猫', bookTitle: '百年孤独', bookAuthor: '加西亚·马尔克斯', bookCover: initialBooks[0].coverImage, durationMinutes: 40, thoughts: '阿玛兰妲的自我折磨让人又爱又恨。', checkInDate: daysAgo(1).split('T')[0], createdAt: daysAgo(1) },
+  { id: 6, nickname: '夜读者', bookTitle: '活着', bookAuthor: '余华', bookCover: initialBooks[4].coverImage, durationMinutes: 90, thoughts: '福贵的一生太苦了，但活着本身就是意义。', checkInDate: daysAgo(3).split('T')[0], createdAt: daysAgo(3) },
+  { id: 7, nickname: '夜读者', bookTitle: '活着', bookAuthor: '余华', bookCover: initialBooks[4].coverImage, durationMinutes: 75, thoughts: '读完这本书让我重新思考生命的意义。', checkInDate: daysAgo(2).split('T')[0], createdAt: daysAgo(2) },
+  { id: 8, nickname: '小王子的玫瑰', bookTitle: '小王子', bookAuthor: '安托万·德·圣-埃克苏佩里', bookCover: initialBooks[1].coverImage, durationMinutes: 30, thoughts: '每次重读都有新的感悟。', checkInDate: daysAgo(1).split('T')[0], createdAt: daysAgo(1) },
+]
+
 const initialDB: Database = {
   books: initialBooks,
   traceLogs: initialTraceLogs,
@@ -658,6 +671,7 @@ const initialDB: Database = {
   bookshelfLikes: initialBookshelfLikes,
   feedbacks: [],
   monthlyStars: initialMonthlyStars,
+  readingCheckIns: initialReadingCheckIns,
   nextBookId: 6,
   nextTraceLogId: 9,
   nextReviewId: 9,
@@ -682,6 +696,7 @@ const initialDB: Database = {
   nextBookshelfLikeId: 26,
   nextFeedbackId: 1,
   nextMonthlyStarId: 11,
+  nextReadingCheckInId: 9,
 }
 
 let db: Database = initialDB
@@ -799,6 +814,17 @@ function loadDB(): Database {
       
       if (parsed.nextMonthlyStarId === undefined) {
         parsed.nextMonthlyStarId = (parsed.monthlyStars?.length || 0) + 1
+      }
+      
+      if (!parsed.readingCheckIns) {
+        parsed.readingCheckIns = initialReadingCheckIns
+        parsed.nextReadingCheckInId = 9
+        saveDB(parsed as Database)
+        console.log('[DB Migration] 初始化阅读打卡数据')
+      }
+      
+      if (parsed.nextReadingCheckInId === undefined) {
+        parsed.nextReadingCheckInId = (parsed.readingCheckIns?.length || 0) + 1
       }
       
       console.log(`[DB] 已从 ${DATA_FILE} 加载数据`)
@@ -2745,4 +2771,125 @@ export function calculateMonthlyStars(targetYear?: number, targetMonth?: number)
   console.log(`[MonthlyStars] 已生成 ${year}年${month}月 月度之星：借阅之星 ${borrowStars.length} 人，评论之星 ${reviewStars.length} 人`)
 
   return { year, month, borrowStars, reviewStars, generatedAt: createdAt }
+}
+
+export function createReadingCheckIn(data: CreateReadingCheckInRequest): { checkIn: ReadingCheckIn; pointsResult?: ReturnType<typeof addPoints> } {
+  const now = new Date()
+  const todayStr = now.toISOString().split('T')[0]
+  
+  const existingToday = db.readingCheckIns.find(
+    c => c.nickname === data.nickname && c.checkInDate === todayStr
+  )
+  if (existingToday) {
+    throw new Error('今天已经打卡过了')
+  }
+
+  const checkIn: ReadingCheckIn = {
+    id: db.nextReadingCheckInId++,
+    nickname: data.nickname,
+    bookTitle: data.bookTitle,
+    bookAuthor: data.bookAuthor,
+    bookCover: data.bookCover,
+    durationMinutes: data.durationMinutes,
+    thoughts: data.thoughts,
+    checkInDate: todayStr,
+    createdAt: now.toISOString(),
+  }
+  db.readingCheckIns.push(checkIn)
+
+  let pointsResult
+  if (data.durationMinutes >= 30) {
+    pointsResult = addPoints(
+      data.nickname,
+      'review',
+      `阅读打卡《${data.bookTitle}》${data.durationMinutes}分钟`,
+      undefined
+    )
+  }
+
+  persistDB()
+  console.log(`[ReadingCheckIn] 新打卡: #${checkIn.id} ${data.nickname} - ${data.bookTitle}`)
+  return { checkIn, pointsResult }
+}
+
+export function getReadingCheckInsByUser(nickname: string, limit?: number): ReadingCheckIn[] {
+  let checkIns = db.readingCheckIns
+    .filter(c => c.nickname === nickname)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  if (limit) {
+    checkIns = checkIns.slice(0, limit)
+  }
+  return checkIns
+}
+
+export function getTodayReadingCheckInCount(): number {
+  const todayStr = new Date().toISOString().split('T')[0]
+  return new Set(db.readingCheckIns
+    .filter(c => c.checkInDate === todayStr)
+    .map(c => c.nickname)).size
+}
+
+export function getUserReadingStreak(nickname: string): number {
+  const checkIns = db.readingCheckIns
+    .filter(c => c.nickname === nickname)
+    .map(c => c.checkInDate)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+  
+  if (checkIns.length === 0) return 0
+
+  let streak = 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  for (let i = 0; i < 365; i++) {
+    const checkDate = new Date(today)
+    checkDate.setDate(today.getDate() - i)
+    const dateStr = checkDate.toISOString().split('T')[0]
+    if (checkIns.includes(dateStr)) {
+      streak++
+    } else if (i > 0) {
+      break
+    }
+  }
+  
+  return streak
+}
+
+export function getReadingCheckInStats(nickname: string): ReadingCheckInStats {
+  const userCheckIns = db.readingCheckIns.filter(c => c.nickname === nickname)
+  return {
+    todayCheckInCount: getTodayReadingCheckInCount(),
+    userStreakDays: getUserReadingStreak(nickname),
+    userTotalCheckIns: userCheckIns.length,
+    userTotalMinutes: userCheckIns.reduce((sum, c) => sum + c.durationMinutes, 0),
+  }
+}
+
+export function getReadingHeatmapData(nickname: string, days: number = 365): ReadingCheckInHeatmapData[] {
+  const result: Map<string, ReadingCheckInHeatmapData> = new Map()
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const cutoffDate = new Date(today)
+  cutoffDate.setDate(cutoffDate.getDate() - (days - 1))
+  const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
+
+  const userCheckIns = db.readingCheckIns.filter(
+    c => c.nickname === nickname && c.checkInDate >= cutoffDateStr
+  )
+
+  for (const checkIn of userCheckIns) {
+    const existing = result.get(checkIn.checkInDate)
+    if (existing) {
+      existing.count++
+      existing.durationMinutes += checkIn.durationMinutes
+    } else {
+      result.set(checkIn.checkInDate, {
+        date: checkIn.checkInDate,
+        count: 1,
+        durationMinutes: checkIn.durationMinutes,
+      })
+    }
+  }
+
+  return Array.from(result.values()).sort((a, b) => a.date.localeCompare(b.date))
 }

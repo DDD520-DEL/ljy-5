@@ -4,9 +4,11 @@ import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, Chevro
 import FeedbackModal from '@/components/FeedbackModal'
 import NotificationCenter from '@/components/NotificationCenter'
 import MonthlyStarsWall from '@/components/MonthlyStarsWall'
-import { bookApi, bookshelfApi, meetupApi } from '@/lib/api'
+import ReadingCheckInForm from '@/components/ReadingCheckInForm'
+import ReadingHeatmap from '@/components/ReadingHeatmap'
+import { bookApi, bookshelfApi, meetupApi, readingCheckInApi } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type { Book as BookType, Bookshelf, Meetup } from '../../shared/types'
+import type { Book as BookType, Bookshelf, Meetup, ReadingCheckInStats, ReadingCheckInHeatmapData } from '../../shared/types'
 
 export default function Home() {
   const [nickname, setNickname] = useState<string>('爱读书的猫')
@@ -20,6 +22,8 @@ export default function Home() {
   const [highlightMeetups, setHighlightMeetups] = useState<Meetup[]>([])
   const [highlightsLoading, setHighlightsLoading] = useState(true)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [readingStats, setReadingStats] = useState<ReadingCheckInStats | null>(null)
+  const [readingHeatmap, setReadingHeatmap] = useState<ReadingCheckInHeatmapData[]>([])
 
   useEffect(() => {
     async function loadRecommendations() {
@@ -66,6 +70,35 @@ export default function Home() {
     }
     loadHighlights()
   }, [])
+
+  useEffect(() => {
+    async function loadReadingData() {
+      try {
+        const [stats, heatmap] = await Promise.all([
+          readingCheckInApi.getStats(nickname),
+          readingCheckInApi.getHeatmap(nickname, 180),
+        ])
+        setReadingStats(stats)
+        setReadingHeatmap(heatmap)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    loadReadingData()
+  }, [nickname])
+
+  async function handleCheckInSuccess() {
+    try {
+      const [stats, heatmap] = await Promise.all([
+        readingCheckInApi.getStats(nickname),
+        readingCheckInApi.getHeatmap(nickname, 180),
+      ])
+      setReadingStats(stats)
+      setReadingHeatmap(heatmap)
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   const readerNicknames = [
     '爱读书的猫',
@@ -256,6 +289,23 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="py-12 px-4 bg-gradient-to-b from-coffee-50/50 to-white">
+        <div className="container max-w-4xl mx-auto">
+          {readingStats && (
+            <ReadingCheckInForm
+              nickname={nickname}
+              stats={readingStats}
+              onSuccess={handleCheckInSuccess}
+            />
+          )}
+          {readingHeatmap.length > 0 && (
+            <div className="mt-6">
+              <ReadingHeatmap data={readingHeatmap} months={4} />
+            </div>
+          )}
         </div>
       </section>
       

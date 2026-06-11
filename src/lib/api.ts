@@ -55,6 +55,10 @@ import type {
   CreateFeedbackRequest,
   UpdateFeedbackStatusRequest,
   MonthlyStarsResult,
+  ReadingCheckIn,
+  CreateReadingCheckInRequest,
+  ReadingCheckInStats,
+  ReadingCheckInHeatmapData,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -499,4 +503,26 @@ export const starsApi = {
       method: 'POST',
       body: JSON.stringify({ year, month }),
     }),
+}
+
+export const readingCheckInApi = {
+  create: (data: CreateReadingCheckInRequest) =>
+    request<{ checkIn: ReadingCheckIn; pointsResult?: { account: PointsAccount; log: PointsLog; levelUp: boolean } }>('/reading-checkins', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getByUser: (nickname: string, limit?: number) => {
+    const qs = new URLSearchParams()
+    if (limit) qs.set('limit', limit.toString())
+    const query = qs.toString()
+    return request<ReadingCheckIn[]>(`/reading-checkins/user/${encodeURIComponent(nickname)}${query ? `?${query}` : ''}`)
+  },
+  getStats: (nickname: string) =>
+    request<ReadingCheckInStats>(`/reading-checkins/stats/${encodeURIComponent(nickname)}`),
+  getHeatmap: (nickname: string, days?: number) => {
+    const qs = new URLSearchParams()
+    if (days) qs.set('days', days.toString())
+    const query = qs.toString()
+    return request<ReadingCheckInHeatmapData[]>(`/reading-checkins/heatmap/${encodeURIComponent(nickname)}${query ? `?${query}` : ''}`)
+  },
 }

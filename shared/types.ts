@@ -656,3 +656,37 @@ export interface MonthlyStarsResult {
   reviewStars: MonthlyStar[]
   generatedAt: string
 }
+
+export interface ReadingCheckIn {
+  id: number
+  nickname: string
+  bookTitle: string
+  bookAuthor?: string
+  bookCover?: string
+  durationMinutes: number
+  thoughts?: string
+  checkInDate: string
+  createdAt: string
+}
+
+export interface CreateReadingCheckInRequest {
+  nickname: string
+  bookTitle: string
+  bookAuthor?: string
+  bookCover?: string
+  durationMinutes: number
+  thoughts?: string
+}
+
+export interface ReadingCheckInStats {
+  todayCheckInCount: number
+  userStreakDays: number
+  userTotalCheckIns: number
+  userTotalMinutes: number
+}
+
+export interface ReadingCheckInHeatmapData {
+  date: string
+  count: number
+  durationMinutes: number
+}

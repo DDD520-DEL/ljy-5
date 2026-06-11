@@ -28,8 +28,10 @@ import {
   Bell,
   Mail,
   BookMarked,
+  Flame,
+  CalendarDays,
 } from 'lucide-react'
-import { bookApi, bookshelfApi } from '@/lib/api'
+import { bookApi, bookshelfApi, readingCheckInApi } from '@/lib/api'
 import {
   formatDate,
   formatDateTime,
@@ -46,7 +48,9 @@ import {
   cn,
   calculateDaysRemaining,
 } from '@/lib/utils'
-import type { ReaderProfile as ReaderProfileType, Review, PointsLog, DonationReview, Note, BorrowRecordWithBook, Notification, Bookshelf } from '../../shared/types'
+import type { ReaderProfile as ReaderProfileType, Review, PointsLog, DonationReview, Note, BorrowRecordWithBook, Notification, Bookshelf, ReadingCheckIn, ReadingCheckInStats, ReadingCheckInHeatmapData } from '../../shared/types'
+import ReadingCheckInTimeline from '@/components/ReadingCheckInTimeline'
+import ReadingHeatmap from '@/components/ReadingHeatmap'
 
 export default function ReaderProfile() {
   const { nickname } = useParams<{ nickname: string }>()
@@ -54,26 +58,35 @@ export default function ReaderProfile() {
   const [profile, setProfile] = useState<ReaderProfileType | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'history' | 'borrow' | 'current' | 'overdue' | 'reviews' | 'notes' | 'meetups' | 'donations' | 'notifications' | 'bookshelves'>('history')
+  const [activeTab, setActiveTab] = useState<'history' | 'borrow' | 'current' | 'overdue' | 'reviews' | 'notes' | 'meetups' | 'donations' | 'notifications' | 'bookshelves' | 'reading'>('history')
   const [activeBorrows, setActiveBorrows] = useState<BorrowRecordWithBook[]>([])
   const [overdueBorrows, setOverdueBorrows] = useState<BorrowRecordWithBook[]>([])
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [markingRead, setMarkingRead] = useState<Record<number, boolean>>({})
   const [bookshelves, setBookshelves] = useState<Bookshelf[]>([])
+  const [readingCheckIns, setReadingCheckIns] = useState<ReadingCheckIn[]>([])
+  const [readingStats, setReadingStats] = useState<ReadingCheckInStats | null>(null)
+  const [readingHeatmap, setReadingHeatmap] = useState<ReadingCheckInHeatmapData[]>([])
 
   const loadProfile = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
       const decodedNickname = decodeURIComponent(nickname!)
-      const [profileData, notifData, bookshelfData] = await Promise.all([
+      const [profileData, notifData, bookshelfData, checkInData, statsData, heatmapData] = await Promise.all([
         bookApi.readerProfile(decodedNickname),
         bookApi.getNotifications(decodedNickname).catch(() => []),
         bookshelfApi.getByUser(decodedNickname).catch(() => []),
+        readingCheckInApi.getByUser(decodedNickname).catch(() => []),
+        readingCheckInApi.getStats(decodedNickname).catch(() => null),
+        readingCheckInApi.getHeatmap(decodedNickname, 365).catch(() => []),
       ])
       setProfile(profileData)
       setNotifications(notifData)
       setBookshelves(bookshelfData)
+      setReadingCheckIns(checkInData)
+      setReadingStats(statsData)
+      setReadingHeatmap(heatmapData)
       const allActive = profileData.currentBorrowings || []
       setActiveBorrows(allActive)
       setOverdueBorrows(allActive.filter(b => b.status === 'overdue'))
@@ -149,16 +162,18 @@ export default function ReaderProfile() {
     { label: '逾期图书', value: overdueBorrows.length, icon: AlertTriangle, color: overdueBorrows.length > 0 ? 'from-red-500 to-red-700' : 'from-gray-400 to-gray-600', bg: overdueBorrows.length > 0 ? 'bg-red-50' : 'bg-gray-50' },
     { label: '发表书评', value: account.reviewCount, icon: MessageSquare, color: 'from-emerald-500 to-emerald-700', bg: 'bg-emerald-50' },
     { label: '未读通知', value: notifications.filter(n => !n.read).length, icon: Bell, color: notifications.filter(n => !n.read).length > 0 ? 'from-purple-500 to-purple-700' : 'from-gray-400 to-gray-600', bg: notifications.filter(n => !n.read).length > 0 ? 'bg-purple-50' : 'bg-gray-50' },
+    { label: '连续打卡', value: readingStats?.userStreakDays || 0, icon: Flame, color: readingStats && readingStats.userStreakDays > 0 ? 'from-orange-500 to-orange-700' : 'from-gray-400 to-gray-600', bg: readingStats && readingStats.userStreakDays > 0 ? 'bg-orange-50' : 'bg-gray-50' },
   ]
 
   const tabs: Array<{
-    id: 'history' | 'borrow' | 'current' | 'overdue' | 'reviews' | 'notes' | 'meetups' | 'donations' | 'notifications' | 'bookshelves'
+    id: 'history' | 'borrow' | 'current' | 'overdue' | 'reviews' | 'notes' | 'meetups' | 'donations' | 'notifications' | 'bookshelves' | 'reading'
     label: string
-    icon: any
+    icon: React.ComponentType<{ className?: string }>
     count: number
     badge?: { count: number; color: string }
   }> = [
     { id: 'history', label: '积分动态', icon: TrendingUp, count: logs.length },
+    { id: 'reading', label: '阅读打卡', icon: CalendarDays, count: readingStats?.userTotalCheckIns || 0 },
     { id: 'current', label: '当前借阅', icon: CalendarClock, count: activeBorrows.length, badge: overdueBorrows.length > 0 ? { count: overdueBorrows.length, color: 'bg-red-500 text-white' } : undefined },
     { id: 'overdue', label: '逾期记录', icon: AlertTriangle, count: overdueBorrows.length, badge: overdueBorrows.length > 0 ? { count: overdueBorrows.length, color: 'bg-red-500 text-white' } : undefined },
     { id: 'borrow', label: '借阅历史', icon: BookOpen, count: borrowHistory.length },
@@ -355,6 +370,43 @@ export default function ReaderProfile() {
                         </div>
                       </div>
                     ))
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'reading' && (
+                <div className="space-y-6">
+                  {readingStats && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 text-center">
+                        <p className="text-2xl font-bold text-orange-700">{readingStats.userStreakDays}</p>
+                        <p className="text-sm text-orange-600">连续打卡天数</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 text-center">
+                        <p className="text-2xl font-bold text-emerald-700">{readingStats.userTotalCheckIns}</p>
+                        <p className="text-sm text-emerald-600">累计打卡次数</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-sky-50 to-sky-100 border border-sky-200 text-center">
+                        <p className="text-2xl font-bold text-sky-700">{readingStats.userTotalMinutes}</p>
+                        <p className="text-sm text-sky-600">累计阅读分钟</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 text-center">
+                        <p className="text-2xl font-bold text-purple-700">{readingStats.todayCheckInCount}</p>
+                        <p className="text-sm text-purple-600">今日打卡人数</p>
+                      </div>
+                    </div>
+                  )}
+                  {readingHeatmap.length > 0 && (
+                    <ReadingHeatmap data={readingHeatmap} months={12} />
+                  )}
+                  {readingCheckIns.length > 0 ? (
+                    <ReadingCheckInTimeline checkIns={readingCheckIns} />
+                  ) : (
+                    <div className="text-center py-12">
+                      <CalendarDays className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+                      <p className="text-coffee-400">还没有打卡记录</p>
+                      <p className="text-sm text-coffee-300 mt-1">去首页开始你的第一次阅读打卡吧</p>
+                    </div>
                   )}
                 </div>
               )}
