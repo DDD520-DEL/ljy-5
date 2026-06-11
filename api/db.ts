@@ -2830,28 +2830,30 @@ export function getTodayReadingCheckInCount(): number {
 }
 
 export function getUserReadingStreak(nickname: string): number {
-  const checkIns = db.readingCheckIns
-    .filter(c => c.nickname === nickname)
-    .map(c => c.checkInDate)
-    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
-  
-  if (checkIns.length === 0) return 0
+  const checkIns = new Set(
+    db.readingCheckIns
+      .filter(c => c.nickname === nickname)
+      .map(c => c.checkInDate)
+  )
 
-  let streak = 0
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  
+  const todayStr = today.toISOString().split('T')[0]
+
+  if (!checkIns.has(todayStr)) return 0
+
+  let streak = 0
   for (let i = 0; i < 365; i++) {
     const checkDate = new Date(today)
     checkDate.setDate(today.getDate() - i)
     const dateStr = checkDate.toISOString().split('T')[0]
-    if (checkIns.includes(dateStr)) {
+    if (checkIns.has(dateStr)) {
       streak++
-    } else if (i > 0) {
+    } else {
       break
     }
   }
-  
+
   return streak
 }
 
