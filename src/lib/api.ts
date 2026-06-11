@@ -54,6 +54,7 @@ import type {
   FeedbackStatus,
   CreateFeedbackRequest,
   UpdateFeedbackStatusRequest,
+  MonthlyStarsResult,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -441,5 +442,17 @@ export const feedbackApi = {
     request<{ feedback: Feedback }>(`/feedbacks/${id}/status`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    }),
+}
+
+export const starsApi = {
+  getLatest: () =>
+    request<MonthlyStarsResult>('/stars/latest'),
+  getByMonth: (year: number, month: number) =>
+    request<MonthlyStarsResult>(`/stars/${year}/${month}`),
+  calculate: (year?: number, month?: number) =>
+    request<MonthlyStarsResult>('/stars/calculate', {
+      method: 'POST',
+      body: JSON.stringify({ year, month }),
     }),
 }

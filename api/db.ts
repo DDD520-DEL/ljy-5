@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat, Bookshelf, BookshelfBook, BookshelfLike, BookshelfVisibility, CreateBookshelfRequest, UpdateBookshelfRequest, BookshelfWithBooks, BookshelfWithOwner, RatingStats, Feedback, FeedbackType, FeedbackStatus, CreateFeedbackRequest, UpdateFeedbackStatusRequest } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat, Bookshelf, BookshelfBook, BookshelfLike, BookshelfVisibility, CreateBookshelfRequest, UpdateBookshelfRequest, BookshelfWithBooks, BookshelfWithOwner, RatingStats, Feedback, FeedbackType, FeedbackStatus, CreateFeedbackRequest, UpdateFeedbackStatusRequest, MonthlyStar, MonthlyStarsResult, StarType } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -390,6 +390,7 @@ export interface Database {
   bookshelfBooks: BookshelfBook[]
   bookshelfLikes: BookshelfLike[]
   feedbacks: Feedback[]
+  monthlyStars: MonthlyStar[]
   nextBookId: number
   nextTraceLogId: number
   nextReviewId: number
@@ -413,6 +414,7 @@ export interface Database {
   nextBookshelfBookId: number
   nextBookshelfLikeId: number
   nextFeedbackId: number
+  nextMonthlyStarId: number
 }
 
 const initialCheckIns: CheckIn[] = [
@@ -616,6 +618,19 @@ const initialBookshelfLikes: BookshelfLike[] = [
   { id: 25, bookshelfId: 3, nickname: '夜读者', createdAt: daysAgo(3) },
 ]
 
+const initialMonthlyStars: MonthlyStar[] = [
+  { id: 1, year: 2026, month: 5, type: 'borrow', nickname: '夜读者', count: 3, rank: 1, createdAt: '2026-06-01T00:00:00.000Z' },
+  { id: 2, year: 2026, month: 5, type: 'borrow', nickname: '爱读书的猫', count: 2, rank: 2, createdAt: '2026-06-01T00:00:00.000Z' },
+  { id: 3, year: 2026, month: 5, type: 'borrow', nickname: '小王子的玫瑰', count: 2, rank: 3, createdAt: '2026-06-01T00:00:00.000Z' },
+  { id: 4, year: 2026, month: 5, type: 'borrow', nickname: '童话少女', count: 1, rank: 4, createdAt: '2026-06-01T00:00:00.000Z' },
+  { id: 5, year: 2026, month: 5, type: 'borrow', nickname: '读书人小刘', count: 1, rank: 5, createdAt: '2026-06-01T00:00:00.000Z' },
+  { id: 6, year: 2026, month: 5, type: 'review', nickname: '爱读书的猫', count: 2, rank: 1, createdAt: '2026-06-01T00:00:00.000Z' },
+  { id: 7, year: 2026, month: 5, type: 'review', nickname: '夜读者', count: 1, rank: 2, createdAt: '2026-06-01T00:00:00.000Z' },
+  { id: 8, year: 2026, month: 5, type: 'review', nickname: '小王子的玫瑰', count: 1, rank: 3, createdAt: '2026-06-01T00:00:00.000Z' },
+  { id: 9, year: 2026, month: 5, type: 'review', nickname: '书虫阿明', count: 1, rank: 4, createdAt: '2026-06-01T00:00:00.000Z' },
+  { id: 10, year: 2026, month: 5, type: 'review', nickname: '追风筝的人', count: 1, rank: 5, createdAt: '2026-06-01T00:00:00.000Z' },
+]
+
 const initialDB: Database = {
   books: initialBooks,
   traceLogs: initialTraceLogs,
@@ -642,6 +657,7 @@ const initialDB: Database = {
   bookshelfBooks: initialBookshelfBooks,
   bookshelfLikes: initialBookshelfLikes,
   feedbacks: [],
+  monthlyStars: initialMonthlyStars,
   nextBookId: 6,
   nextTraceLogId: 9,
   nextReviewId: 9,
@@ -665,6 +681,7 @@ const initialDB: Database = {
   nextBookshelfBookId: 9,
   nextBookshelfLikeId: 26,
   nextFeedbackId: 1,
+  nextMonthlyStarId: 11,
 }
 
 let db: Database = initialDB
@@ -773,9 +790,20 @@ function loadDB(): Database {
         parsed.nextFeedbackId = (parsed.feedbacks?.length || 0) + 1
       }
       
+      if (!parsed.monthlyStars) {
+        parsed.monthlyStars = initialMonthlyStars
+        parsed.nextMonthlyStarId = 11
+        saveDB(parsed as Database)
+        console.log('[DB Migration] 初始化月度之星数据')
+      }
+      
+      if (parsed.nextMonthlyStarId === undefined) {
+        parsed.nextMonthlyStarId = (parsed.monthlyStars?.length || 0) + 1
+      }
+      
       console.log(`[DB] 已从 ${DATA_FILE} 加载数据`)
       console.log(`[DB] 图书: ${parsed.books?.length || 0} 本 | 读书会: ${parsed.meetups?.length || 0} 个 | 短评: ${parsed.reviews?.length || 0} 条 | 笔记: ${parsed.notes?.length || 0} 条`)
-      console.log(`[DB] 借阅记录: ${parsed.borrowRecords?.length || 0} 条 | 通知: ${parsed.notifications?.length || 0} 条 | 讨论帖: ${parsed.meetupDiscussionPosts?.length || 0} 条 | 书单: ${parsed.bookshelves?.length || 0} 个 | 反馈: ${parsed.feedbacks?.length || 0} 条`)
+      console.log(`[DB] 借阅记录: ${parsed.borrowRecords?.length || 0} 条 | 通知: ${parsed.notifications?.length || 0} 条 | 讨论帖: ${parsed.meetupDiscussionPosts?.length || 0} 条 | 书单: ${parsed.bookshelves?.length || 0} 个 | 反馈: ${parsed.feedbacks?.length || 0} 条 | 月度之星: ${parsed.monthlyStars?.length || 0} 条`)
       return parsed as Database
     } catch (err) {
       console.error('[DB] 数据文件读取失败，使用初始数据:', err)
@@ -2604,4 +2632,117 @@ export function getFeedbackStats(): { total: number; pending: number; processing
     stats[f.status]++
   }
   return stats
+}
+
+export function getMonthlyStars(year: number, month: number): MonthlyStarsResult | null {
+  const stars = db.monthlyStars.filter(s => s.year === year && s.month === month)
+  if (stars.length === 0) {
+    return null
+  }
+  const borrowStars = stars.filter(s => s.type === 'borrow').sort((a, b) => a.rank - b.rank)
+  const reviewStars = stars.filter(s => s.type === 'review').sort((a, b) => a.rank - b.rank)
+  const generatedAt = stars.length > 0 ? stars[0].createdAt : new Date().toISOString()
+  return { year, month, borrowStars, reviewStars, generatedAt }
+}
+
+export function getLatestMonthlyStars(): MonthlyStarsResult | null {
+  if (db.monthlyStars.length === 0) return null
+  const sorted = [...db.monthlyStars].sort((a, b) => {
+    if (a.year !== b.year) return b.year - a.year
+    return b.month - a.month
+  })
+  const latest = sorted[0]
+  return getMonthlyStars(latest.year, latest.month)
+}
+
+function getMonthRange(year: number, month: number): { start: Date; end: Date } {
+  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0))
+  const end = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0))
+  return { start, end }
+}
+
+export function calculateMonthlyStars(targetYear?: number, targetMonth?: number): MonthlyStarsResult {
+  const now = new Date()
+  let year = targetYear ?? now.getUTCFullYear()
+  let month = targetMonth ?? now.getUTCMonth()
+  if (month === 0) {
+    month = 12
+    year = year - 1
+  }
+
+  const { start, end } = getMonthRange(year, month)
+
+  const existing = db.monthlyStars.filter(s => s.year === year && s.month === month)
+  if (existing.length > 0) {
+    for (const s of existing) {
+      const idx = db.monthlyStars.findIndex(ms => ms.id === s.id)
+      if (idx >= 0) db.monthlyStars.splice(idx, 1)
+    }
+  }
+
+  const borrowCountMap = new Map<string, number>()
+  for (const record of db.borrowRecords) {
+    const borrowDate = new Date(record.borrowDate)
+    if (borrowDate >= start && borrowDate < end) {
+      borrowCountMap.set(record.borrower, (borrowCountMap.get(record.borrower) || 0) + 1)
+    }
+  }
+  for (const log of db.traceLogs) {
+    if (log.action === '借出') {
+      const logDate = new Date(log.timestamp)
+      if (logDate >= start && logDate < end) {
+        const nickname = log.description.split('读者')[1]?.split('借阅')[0]?.trim()
+        if (nickname) {
+          borrowCountMap.set(nickname, (borrowCountMap.get(nickname) || 0) + 1)
+        }
+      }
+    }
+  }
+
+  const borrowRanking = Array.from(borrowCountMap.entries())
+    .map(([nickname, count]) => ({ nickname, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+
+  const reviewCountMap = new Map<string, number>()
+  for (const review of db.reviews) {
+    const reviewDate = new Date(review.createdAt)
+    if (reviewDate >= start && reviewDate < end) {
+      reviewCountMap.set(review.nickname, (reviewCountMap.get(review.nickname) || 0) + 1)
+    }
+  }
+
+  const reviewRanking = Array.from(reviewCountMap.entries())
+    .map(([nickname, count]) => ({ nickname, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+
+  const createdAt = new Date().toISOString()
+  const borrowStars: MonthlyStar[] = borrowRanking.map((item, idx) => ({
+    id: db.nextMonthlyStarId++,
+    year,
+    month,
+    type: 'borrow' as StarType,
+    nickname: item.nickname,
+    count: item.count,
+    rank: idx + 1,
+    createdAt
+  }))
+  const reviewStars: MonthlyStar[] = reviewRanking.map((item, idx) => ({
+    id: db.nextMonthlyStarId++,
+    year,
+    month,
+    type: 'review' as StarType,
+    nickname: item.nickname,
+    count: item.count,
+    rank: idx + 1,
+    createdAt
+  }))
+
+  db.monthlyStars.push(...borrowStars, ...reviewStars)
+  persistDB()
+
+  console.log(`[MonthlyStars] 已生成 ${year}年${month}月 月度之星：借阅之星 ${borrowStars.length} 人，评论之星 ${reviewStars.length} 人`)
+
+  return { year, month, borrowStars, reviewStars, generatedAt: createdAt }
 }

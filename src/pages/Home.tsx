@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, ChevronRight, BookMarked, Star, User, Tag, Eye, Globe, MessageSquare } from 'lucide-react'
 import FeedbackModal from '@/components/FeedbackModal'
 import NotificationCenter from '@/components/NotificationCenter'
+import MonthlyStarsWall from '@/components/MonthlyStarsWall'
 import { bookApi, bookshelfApi } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { Book as BookType, Bookshelf } from '../../shared/types'
@@ -457,6 +458,8 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      <MonthlyStarsWall />
       
       <section className="py-20 px-4 bg-gradient-to-b from-white to-coffee-50">
         <div className="container max-w-5xl mx-auto">

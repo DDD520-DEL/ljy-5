@@ -18,6 +18,7 @@ import notesRoutes from './routes/notes.js'
 import exchangesRoutes from './routes/exchanges.js'
 import bookshelvesRoutes from './routes/bookshelves.js'
 import feedbacksRoutes from './routes/feedbacks.js'
+import starsRoutes from './routes/stars.js'
 
 // load env
 dotenv.config()
@@ -40,6 +41,7 @@ app.use('/api/notes', notesRoutes)
 app.use('/api/exchanges', exchangesRoutes)
 app.use('/api/bookshelves', bookshelvesRoutes)
 app.use('/api/feedbacks', feedbacksRoutes)
+app.use('/api/stars', starsRoutes)
 
 /**
  * health

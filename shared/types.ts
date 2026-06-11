@@ -634,3 +634,25 @@ export interface UpdateFeedbackStatusRequest {
   reply?: string
   operator?: string
 }
+
+export type StarType = 'borrow' | 'review'
+
+export interface MonthlyStar {
+  id: number
+  year: number
+  month: number
+  type: StarType
+  nickname: string
+  count: number
+  rank: number
+  avatar?: string
+  createdAt: string
+}
+
+export interface MonthlyStarsResult {
+  year: number
+  month: number
+  borrowStars: MonthlyStar[]
+  reviewStars: MonthlyStar[]
+  generatedAt: string
+}
