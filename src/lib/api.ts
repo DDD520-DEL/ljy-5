@@ -162,8 +162,17 @@ export const traceApi = {
 }
 
 export const meetupApi = {
-  list: (status?: string) =>
-    request<Meetup[]>(`/meetups${status ? `?status=${status}` : ''}`),
+  list: (status?: string, year?: number) => {
+    const params = new URLSearchParams()
+    if (status) params.set('status', status)
+    if (year) params.set('year', year.toString())
+    const query = params.toString()
+    return request<Meetup[]>(`/meetups${query ? `?${query}` : ''}`)
+  },
+  getArchiveYears: () =>
+    request<number[]>('/meetups/archive/years'),
+  getHighlights: (limit: number = 3) =>
+    request<Meetup[]>(`/meetups/archive/highlights?limit=${limit}`),
   get: (id: number) =>
     request<Meetup & { registrations: (Registration & { level?: string })[]; checkIns: CheckIn[]; checkInStats: MeetupCheckInStats }>(`/meetups/${id}`),
   create: (data: CreateMeetupRequest) =>

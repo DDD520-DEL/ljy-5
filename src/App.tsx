@@ -10,6 +10,7 @@ import MeetupList from "@/pages/MeetupList";
 import MeetupCreate from "@/pages/MeetupCreate";
 import MeetupDetail from "@/pages/MeetupDetail";
 import MeetupCheckIn from "@/pages/MeetupCheckIn";
+import MeetupArchive from "@/pages/MeetupArchive";
 import ReservationManage from "@/pages/ReservationManage";
 import ReaderProfile from "@/pages/ReaderProfile";
 import DonationReviewPage from "@/pages/DonationReview";
@@ -25,6 +26,7 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/meetups/archive" element={<MeetupArchive />} />
         <Route path="/trace/:traceId" element={<TraceView />} />
         <Route path="/bookshelves/:id" element={<BookshelfDetail />} />
         <Route element={<Layout />}>

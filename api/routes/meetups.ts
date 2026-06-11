@@ -5,15 +5,38 @@ import type { CreateMeetupRequest, RegisterMeetupRequest, UpdateMeetupSummaryReq
 
 const router = express.Router()
 
+router.get('/archive/years', (_req, res) => {
+  const db = getDB()
+  const finished = db.meetups.filter(m => m.status === 'finished')
+  const years = [...new Set(finished.map(m => new Date(m.date).getFullYear()))].sort((a, b) => b - a)
+  res.json(years)
+})
+
+router.get('/archive/highlights', (req, res) => {
+  const db = getDB()
+  const { limit = '3' } = req.query
+  const limitNum = parseInt(limit as string) || 3
+  let finished = db.meetups.filter(m => m.status === 'finished')
+  finished.sort((a, b) => b.currentParticipants - a.currentParticipants)
+  const top = finished.slice(0, Math.min(limitNum * 3, finished.length))
+  const shuffled = top.sort(() => Math.random() - 0.5)
+  res.json(shuffled.slice(0, limitNum))
+})
+
 router.get('/', (req, res) => {
   const db = getDB()
-  const { status } = req.query
+  const { status, year } = req.query
   let meetups = [...db.meetups]
-  
+
   if (status && typeof status === 'string') {
     meetups = meetups.filter(m => m.status === status)
   }
-  
+
+  if (year && typeof year === 'string') {
+    const yearNum = parseInt(year)
+    meetups = meetups.filter(m => new Date(m.date).getFullYear() === yearNum)
+  }
+
   meetups.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   res.json(meetups)
 })

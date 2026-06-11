@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, ChevronRight, BookMarked, Star, User, Tag, Eye, Globe, MessageSquare } from 'lucide-react'
+import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, ChevronRight, BookMarked, Star, User, Tag, Eye, Globe, MessageSquare, CalendarDays, Archive } from 'lucide-react'
 import FeedbackModal from '@/components/FeedbackModal'
 import NotificationCenter from '@/components/NotificationCenter'
 import MonthlyStarsWall from '@/components/MonthlyStarsWall'
-import { bookApi, bookshelfApi } from '@/lib/api'
+import { bookApi, bookshelfApi, meetupApi } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type { Book as BookType, Bookshelf } from '../../shared/types'
+import type { Book as BookType, Bookshelf, Meetup } from '../../shared/types'
 
 export default function Home() {
   const [nickname, setNickname] = useState<string>('爱读书的猫')
@@ -17,6 +17,8 @@ export default function Home() {
   const [recommendLoading, setRecommendLoading] = useState(true)
   const [popularBookshelves, setPopularBookshelves] = useState<Bookshelf[]>([])
   const [bookshelvesLoading, setBookshelvesLoading] = useState(true)
+  const [highlightMeetups, setHighlightMeetups] = useState<Meetup[]>([])
+  const [highlightsLoading, setHighlightsLoading] = useState(true)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
 
   useEffect(() => {
@@ -48,6 +50,21 @@ export default function Home() {
       }
     }
     loadPopularBookshelves()
+  }, [])
+
+  useEffect(() => {
+    async function loadHighlights() {
+      try {
+        setHighlightsLoading(true)
+        const data = await meetupApi.getHighlights(3)
+        setHighlightMeetups(data)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setHighlightsLoading(false)
+      }
+    }
+    loadHighlights()
   }, [])
 
   const readerNicknames = [
@@ -528,7 +545,97 @@ export default function Home() {
           </div>
         </div>
       </section>
-      
+
+      {highlightMeetups.length > 0 && (
+        <section className="py-20 px-4 bg-gradient-to-b from-amber-50/50 to-white">
+          <div className="container max-w-6xl mx-auto">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm border border-amber-200 mb-4 shadow-sm">
+                <Archive className="w-4 h-4 text-amber-500" />
+                <span className="text-sm text-amber-700">往期精彩</span>
+              </div>
+              <h2 className="text-3xl md:text-4xl font-serif font-bold text-coffee-900 mb-3">
+                那些温暖的读书时光
+              </h2>
+              <p className="text-coffee-600 max-w-xl mx-auto">
+                回顾高人气读书会，重温文字与思想碰撞的精彩瞬间
+              </p>
+            </div>
+
+            {highlightsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="animate-pulse">
+                    <div className="h-40 bg-coffee-100 rounded-xl mb-3" />
+                    <div className="h-5 bg-coffee-100 rounded w-3/4 mb-2" />
+                    <div className="h-4 bg-coffee-100 rounded w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {highlightMeetups.map(meetup => (
+                  <Link
+                    key={meetup.id}
+                    to={`/meetups/${meetup.id}`}
+                    className="group"
+                  >
+                    <div className="relative h-40 rounded-xl overflow-hidden bg-gradient-to-br from-amber-100 to-coffee-100 mb-4 shadow-sm group-hover:shadow-lg transition-all duration-300 group-hover:-translate-y-1">
+                      {meetup.coverImage ? (
+                        <img
+                          src={meetup.coverImage}
+                          alt={meetup.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-400 to-coffee-500">
+                          <CalendarDays className="w-12 h-12 text-white/80" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <div className="absolute top-3 left-3">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/90 backdrop-blur-sm text-[10px] font-medium text-amber-700 border border-amber-200">
+                          <Users className="w-3 h-3" />
+                          {meetup.currentParticipants} 人参与
+                        </span>
+                      </div>
+                    </div>
+                    <h4 className="font-bold text-coffee-800 group-hover:text-amber-700 transition-colors truncate">
+                      {meetup.title}
+                    </h4>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-coffee-500">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {new Date(meetup.date).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        <span className="truncate max-w-[100px]">{meetup.location}</span>
+                      </span>
+                    </div>
+                    {meetup.discussionNotes && (
+                      <p className="text-sm text-coffee-500 line-clamp-2 mt-2">
+                        {meetup.discussionNotes.slice(0, 80)}...
+                      </p>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            <div className="text-center mt-8">
+              <Link
+                to="/meetups/archive"
+                className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium text-coffee-700 border border-coffee-300 rounded-xl hover:bg-coffee-50 transition-all duration-300"
+              >
+                查看全部往期回顾
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="py-16 px-4 bg-coffee-800">
         <div className="container max-w-4xl mx-auto text-center">
           <h2 className="text-2xl md:text-3xl font-serif font-bold text-white mb-4">
