@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat, Bookshelf, BookshelfBook, BookshelfLike, BookshelfVisibility, CreateBookshelfRequest, UpdateBookshelfRequest, BookshelfWithBooks, BookshelfWithOwner, RatingStats, Feedback, FeedbackType, FeedbackStatus, CreateFeedbackRequest, UpdateFeedbackStatusRequest, MonthlyStar, MonthlyStarsResult, StarType, ReadingCheckIn, CreateReadingCheckInRequest, ReadingCheckInStats, ReadingCheckInHeatmapData } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat, Bookshelf, BookshelfBook, BookshelfLike, BookshelfVisibility, CreateBookshelfRequest, UpdateBookshelfRequest, BookshelfWithBooks, BookshelfWithOwner, RatingStats, Feedback, FeedbackType, FeedbackStatus, CreateFeedbackRequest, UpdateFeedbackStatusRequest, MonthlyStar, MonthlyStarsResult, StarType, ReadingCheckIn, CreateReadingCheckInRequest, ReadingCheckInStats, ReadingCheckInHeatmapData, GuestMessage } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -435,6 +435,7 @@ export interface Database {
   feedbacks: Feedback[]
   monthlyStars: MonthlyStar[]
   readingCheckIns: ReadingCheckIn[]
+  guestMessages: GuestMessage[]
   nextBookId: number
   nextTraceLogId: number
   nextReviewId: number
@@ -460,6 +461,7 @@ export interface Database {
   nextFeedbackId: number
   nextMonthlyStarId: number
   nextReadingCheckInId: number
+  nextGuestMessageId: number
 }
 
 const initialCheckIns: CheckIn[] = [
@@ -685,6 +687,15 @@ const initialReadingCheckIns: ReadingCheckIn[] = [
   { id: 8, nickname: '小王子的玫瑰', bookTitle: '小王子', bookAuthor: '安托万·德·圣-埃克苏佩里', bookCover: initialBooks[1].coverImage, durationMinutes: 30, thoughts: '每次重读都有新的感悟。', checkInDate: daysAgo(1).split('T')[0], createdAt: daysAgo(1) },
 ]
 
+const initialGuestMessages: GuestMessage[] = [
+  { id: 1, nickname: '路过的读者', content: '偶然发现这家书店，氛围真的太好了！书架布置很用心，能感受到店主对书籍的热爱。下次一定常来！', createdAt: daysAgo(5) },
+  { id: 2, nickname: '咖啡爱好者', content: '店里的手冲咖啡真的绝了，配着窗外的雨声读了一下午的书，太治愈了。', createdAt: daysAgo(4) },
+  { id: 3, nickname: '书虫阿明', content: '在《百年孤独》里发现了前任读者留下的批注，仿佛穿越时空和另一个灵魂对话，这就是独立书店的魅力吧。', createdAt: daysAgo(3) },
+  { id: 4, nickname: '小王子的玫瑰', content: '上周参加了《小王子》读书会，认识了很多志同道合的朋友，期待下次活动！', createdAt: daysAgo(2) },
+  { id: 5, nickname: '夜读者', content: '感谢老板推荐的《追风筝的人》，哭得稀里哗啦，为你千千万万遍...', createdAt: daysAgo(1) },
+  { id: 6, nickname: '文字的力量', content: '一家有温度的书店，每一本书都像是有故事的老朋友。强烈推荐给所有爱书的人！', createdAt: daysAgo(0).split('T')[0] + 'T09:30:00.000Z' },
+]
+
 const initialDB: Database = {
   books: initialBooks,
   traceLogs: initialTraceLogs,
@@ -713,6 +724,7 @@ const initialDB: Database = {
   feedbacks: [],
   monthlyStars: initialMonthlyStars,
   readingCheckIns: initialReadingCheckIns,
+  guestMessages: initialGuestMessages,
   nextBookId: 8,
   nextTraceLogId: 9,
   nextReviewId: 9,
@@ -738,6 +750,7 @@ const initialDB: Database = {
   nextFeedbackId: 1,
   nextMonthlyStarId: 11,
   nextReadingCheckInId: 9,
+  nextGuestMessageId: 7,
 }
 
 let db: Database = initialDB
@@ -868,8 +881,19 @@ function loadDB(): Database {
         parsed.nextReadingCheckInId = (parsed.readingCheckIns?.length || 0) + 1
       }
       
+      if (!parsed.guestMessages) {
+        parsed.guestMessages = initialGuestMessages
+        parsed.nextGuestMessageId = 7
+        saveDB(parsed as Database)
+        console.log('[DB Migration] 初始化访客留言板数据')
+      }
+      
+      if (parsed.nextGuestMessageId === undefined) {
+        parsed.nextGuestMessageId = (parsed.guestMessages?.length || 0) + 1
+      }
+      
       console.log(`[DB] 已从 ${DATA_FILE} 加载数据`)
-      console.log(`[DB] 图书: ${parsed.books?.length || 0} 本 | 读书会: ${parsed.meetups?.length || 0} 个 | 短评: ${parsed.reviews?.length || 0} 条 | 笔记: ${parsed.notes?.length || 0} 条`)
+      console.log(`[DB] 图书: ${parsed.books?.length || 0} 本 | 读书会: ${parsed.meetups?.length || 0} 个 | 短评: ${parsed.reviews?.length || 0} 条 | 笔记: ${parsed.notes?.length || 0} 条 | 留言: ${parsed.guestMessages?.length || 0} 条`)
       console.log(`[DB] 借阅记录: ${parsed.borrowRecords?.length || 0} 条 | 通知: ${parsed.notifications?.length || 0} 条 | 讨论帖: ${parsed.meetupDiscussionPosts?.length || 0} 条 | 书单: ${parsed.bookshelves?.length || 0} 个 | 反馈: ${parsed.feedbacks?.length || 0} 条 | 月度之星: ${parsed.monthlyStars?.length || 0} 条`)
       return parsed as Database
     } catch (err) {
@@ -2950,4 +2974,84 @@ export function getReadingHeatmapData(nickname: string, days: number = 365): Rea
   }
 
   return Array.from(result.values()).sort((a, b) => a.date.localeCompare(b.date))
+}
+
+export const DAILY_GUEST_MESSAGE_LIMIT = 50
+
+export function getGuestMessageStats(): { total: number; todayCount: number; dailyLimit: number } {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayStr = today.toISOString().split('T')[0]
+  const todayCount = db.guestMessages.filter(m => m.createdAt.split('T')[0] === todayStr).length
+  return {
+    total: db.guestMessages.length,
+    todayCount,
+    dailyLimit: DAILY_GUEST_MESSAGE_LIMIT,
+  }
+}
+
+export function createGuestMessage(data: { nickname: string; content: string; ip?: string }): GuestMessage | { error: string } {
+  const stats = getGuestMessageStats()
+  if (stats.todayCount >= stats.dailyLimit) {
+    return { error: `今日留言已达上限（${stats.dailyLimit}条），请明天再来~` }
+  }
+
+  const nickname = data.nickname.trim()
+  const content = data.content.trim()
+
+  if (!nickname || nickname.length < 1 || nickname.length > 20) {
+    return { error: '昵称长度需在 1-20 个字符之间' }
+  }
+  if (!content || content.length < 2 || content.length > 500) {
+    return { error: '留言内容长度需在 2-500 个字符之间' }
+  }
+
+  const message: GuestMessage = {
+    id: db.nextGuestMessageId++,
+    nickname,
+    content,
+    createdAt: new Date().toISOString(),
+    ip: data.ip,
+  }
+  db.guestMessages.push(message)
+  persistDB()
+  console.log(`[GuestMessage] 新留言: #${message.id} by ${nickname}`)
+  return message
+}
+
+export function getGuestMessages(page: number = 1, pageSize: number = 10): {
+  messages: GuestMessage[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+} {
+  const sorted = [...db.guestMessages].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )
+  const total = sorted.length
+  const startIndex = (page - 1) * pageSize
+  const endIndex = startIndex + pageSize
+  const messages = sorted.slice(startIndex, endIndex)
+  const hasMore = endIndex < total
+  return { messages, total, page, pageSize, hasMore }
+}
+
+export function getAllGuestMessages(): GuestMessage[] {
+  return [...db.guestMessages].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )
+}
+
+export function getGuestMessageById(id: number): GuestMessage | null {
+  return db.guestMessages.find(m => m.id === id) || null
+}
+
+export function deleteGuestMessage(id: number): boolean {
+  const index = db.guestMessages.findIndex(m => m.id === id)
+  if (index === -1) return false
+  db.guestMessages.splice(index, 1)
+  persistDB()
+  console.log(`[GuestMessage] 删除留言: #${id}`)
+  return true
 }

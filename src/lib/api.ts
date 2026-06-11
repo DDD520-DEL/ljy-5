@@ -59,6 +59,10 @@ import type {
   CreateReadingCheckInRequest,
   ReadingCheckInStats,
   ReadingCheckInHeatmapData,
+  GuestMessage,
+  CreateGuestMessageRequest,
+  PaginatedGuestMessages,
+  GuestMessageStats,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -527,4 +531,24 @@ export const readingCheckInApi = {
     const query = qs.toString()
     return request<ReadingCheckInHeatmapData[]>(`/reading-checkins/heatmap/${encodeURIComponent(nickname)}${query ? `?${query}` : ''}`)
   },
+}
+
+export const messageApi = {
+  list: (page: number = 1, pageSize: number = 10) =>
+    request<PaginatedGuestMessages>(`/messages?page=${page}&pageSize=${pageSize}`),
+  listAll: () =>
+    request<GuestMessage[]>('/messages/all'),
+  stats: () =>
+    request<GuestMessageStats>('/messages/stats'),
+  get: (id: number) =>
+    request<GuestMessage>(`/messages/${id}`),
+  create: (data: CreateGuestMessageRequest) =>
+    request<{ message: GuestMessage }>('/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  remove: (id: number) =>
+    request<{ success: boolean }>(`/messages/${id}`, {
+      method: 'DELETE',
+    }),
 }

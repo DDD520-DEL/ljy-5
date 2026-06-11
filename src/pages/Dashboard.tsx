@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus, Star, User, Heart, PenLine, Flame, AlertTriangle, Megaphone, CheckCircle, CalendarClock, AlertCircle, MessageCircle, Coffee, Download, X, FileSpreadsheet, Tag } from 'lucide-react'
-import { bookApi, meetupApi, reservationApi, noteApi, feedbackApi } from '@/lib/api'
-import { formatDate, sourceTypeLabel, sourceTypeColor, meetupStatusLabel, meetupStatusColor, readerLevelLabel, readerLevelColor, cn, calculateDaysRemaining } from '@/lib/utils'
-import type { Book as BookType, Meetup, ReaderRanking, Note, BorrowRecordWithBook, MeetupDiscussionPost } from '../../shared/types'
+import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus, Star, User, Heart, PenLine, Flame, AlertTriangle, Megaphone, CheckCircle, CalendarClock, AlertCircle, MessageCircle, Coffee, Download, X, FileSpreadsheet, Tag, Trash2, RefreshCw } from 'lucide-react'
+import { bookApi, meetupApi, reservationApi, noteApi, feedbackApi, messageApi } from '@/lib/api'
+import { formatDate, formatDateTime, sourceTypeLabel, sourceTypeColor, meetupStatusLabel, meetupStatusColor, readerLevelLabel, readerLevelColor, cn, calculateDaysRemaining } from '@/lib/utils'
+import type { Book as BookType, Meetup, ReaderRanking, Note, BorrowRecordWithBook, MeetupDiscussionPost, GuestMessage, GuestMessageStats } from '../../shared/types'
 
 export default function Dashboard() {
   const [books, setBooks] = useState<BookType[]>([])
@@ -28,6 +28,11 @@ export default function Dashboard() {
   const [exporting, setExporting] = useState(false)
   const [exportSuccess, setExportSuccess] = useState(false)
   const [exportError, setExportError] = useState('')
+  const [guestMessages, setGuestMessages] = useState<GuestMessage[]>([])
+  const [guestMsgStats, setGuestMsgStats] = useState<GuestMessageStats | null>(null)
+  const [deletingMsgId, setDeletingMsgId] = useState<number | null>(null)
+  const [msgDeletedSuccess, setMsgDeletedSuccess] = useState<number | null>(null)
+  const [refreshingMessages, setRefreshingMessages] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -35,7 +40,7 @@ export default function Dashboard() {
 
   async function loadData() {
     try {
-      const [allBooks, borrowRank, discussRank, allMeetups, resStats, pointsRank, borrowCountRank, hotNotesData, activeBorrowsData, overdueBorrowsData, hotDiscussionPostsData, fbStats] = await Promise.all([
+      const [allBooks, borrowRank, discussRank, allMeetups, resStats, pointsRank, borrowCountRank, hotNotesData, activeBorrowsData, overdueBorrowsData, hotDiscussionPostsData, fbStats, gMessages, gMsgStats] = await Promise.all([
         bookApi.list(),
         bookApi.ranking('borrow'),
         bookApi.ranking('discuss'),
@@ -48,6 +53,8 @@ export default function Dashboard() {
         bookApi.getOverdueBorrows(),
         meetupApi.getHotDiscussionPosts(5, 7),
         feedbackApi.stats(),
+        messageApi.listAll(),
+        messageApi.stats(),
       ])
       setBooks(allBooks)
       setBorrowRanking(borrowRank)
@@ -61,6 +68,8 @@ export default function Dashboard() {
       setOverdueBorrows(overdueBorrowsData)
       setHotDiscussionPosts(hotDiscussionPostsData)
       setFeedbackStats(fbStats)
+      setGuestMessages(gMessages)
+      setGuestMsgStats(gMsgStats)
     } catch (err) {
       console.error(err)
     } finally {
@@ -174,6 +183,20 @@ export default function Dashboard() {
       gradient: 'from-gray-500 to-gray-700',
       bg: 'bg-gray-50',
     },
+    {
+      label: '访客留言',
+      value: guestMsgStats?.total ?? 0,
+      icon: MessageCircle,
+      gradient: 'from-rose-500 to-rose-700',
+      bg: 'bg-rose-50',
+    },
+    {
+      label: '今日留言',
+      value: guestMsgStats?.todayCount ?? 0,
+      icon: Calendar,
+      gradient: 'from-orange-500 to-orange-700',
+      bg: 'bg-orange-50',
+    },
   ]
 
   const ranking = rankType === 'borrow' ? borrowRanking : discussRanking
@@ -212,6 +235,36 @@ export default function Dashboard() {
       setExportError(err instanceof Error ? err.message : '导出失败，请稍后重试')
     } finally {
       setExporting(false)
+    }
+  }
+
+  async function handleDeleteMessage(id: number) {
+    if (!confirm('确认删除这条留言吗？删除后无法恢复。')) return
+    try {
+      setDeletingMsgId(id)
+      await messageApi.remove(id)
+      setMsgDeletedSuccess(id)
+      setTimeout(() => setMsgDeletedSuccess(null), 2500)
+      setGuestMessages(prev => prev.filter(m => m.id !== id))
+      const newStats = await messageApi.stats()
+      setGuestMsgStats(newStats)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '删除失败，请稍后重试')
+    } finally {
+      setDeletingMsgId(null)
+    }
+  }
+
+  async function handleRefreshMessages() {
+    try {
+      setRefreshingMessages(true)
+      const [messages, stats] = await Promise.all([messageApi.listAll(), messageApi.stats()])
+      setGuestMessages(messages)
+      setGuestMsgStats(stats)
+    } catch {
+      // ignore
+    } finally {
+      setRefreshingMessages(false)
     }
   }
 
@@ -882,6 +935,91 @@ export default function Dashboard() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+
+      <div className="card p-6">
+        <div className="flex items-center justify-between gap-4 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-500 to-rose-700 flex items-center justify-center flex-shrink-0">
+              <MessageCircle className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="section-title">访客留言管理</h2>
+              <p className="text-sm text-coffee-500">
+                共 {guestMsgStats?.total ?? 0} 条留言，今日 {guestMsgStats?.todayCount ?? 0}/{guestMsgStats?.dailyLimit ?? 50} 条
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleRefreshMessages}
+            disabled={refreshingMessages}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-coffee-600 hover:text-coffee-800 hover:bg-coffee-50 rounded-lg transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshingMessages ? 'animate-spin' : ''}`} />
+            刷新
+          </button>
+        </div>
+
+        {guestMessages.length === 0 ? (
+          <div className="text-center py-12">
+            <MessageCircle className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+            <p className="text-coffee-400">暂无访客留言</p>
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+            {guestMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className={cn(
+                  'p-4 rounded-xl border-2 transition-all duration-200',
+                  msgDeletedSuccess === msg.id
+                    ? 'bg-emerald-50 border-emerald-200'
+                    : 'bg-white border-coffee-100 hover:border-coffee-200'
+                )}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-rose-100 to-orange-100 flex items-center justify-center text-rose-600 flex-shrink-0">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="font-semibold text-coffee-800">{msg.nickname}</span>
+                        <span className="text-xs text-coffee-400">
+                          {formatDateTime(msg.createdAt)}
+                        </span>
+                        <span className="text-xs text-coffee-300">#{msg.id}</span>
+                      </div>
+                      <p className="text-coffee-700 whitespace-pre-wrap break-words leading-relaxed text-sm">
+                        {msg.content}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteMessage(msg.id)}
+                    disabled={deletingMsgId === msg.id}
+                    className={cn(
+                      'flex-shrink-0 p-2 rounded-lg transition-all duration-200 inline-flex items-center gap-1 text-xs font-medium',
+                      msgDeletedSuccess === msg.id
+                        ? 'bg-emerald-100 text-emerald-600'
+                        : 'bg-rose-50 text-rose-600 hover:bg-rose-100',
+                      deletingMsgId === msg.id && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    {deletingMsgId === msg.id ? (
+                      <span className="w-3.5 h-3.5 border-2 border-rose-500/30 border-t-rose-500 rounded-full animate-spin" />
+                    ) : msgDeletedSuccess === msg.id ? (
+                      <CheckCircle className="w-3.5 h-3.5" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" />
+                    )}
+                    {deletingMsgId === msg.id ? '删除中' : msgDeletedSuccess === msg.id ? '已删除' : '删除'}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

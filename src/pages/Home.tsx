@@ -6,6 +6,7 @@ import NotificationCenter from '@/components/NotificationCenter'
 import MonthlyStarsWall from '@/components/MonthlyStarsWall'
 import ReadingCheckInForm from '@/components/ReadingCheckInForm'
 import ReadingHeatmap from '@/components/ReadingHeatmap'
+import GuestMessageBoard from '@/components/GuestMessageBoard'
 import { bookApi, bookshelfApi, meetupApi, readingCheckInApi } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { Book as BookType, Bookshelf, Meetup, ReadingCheckInStats, ReadingCheckInHeatmapData } from '../../shared/types'
@@ -871,6 +872,8 @@ export default function Home() {
           </Link>
         </div>
       </section>
+      
+      <GuestMessageBoard />
       
       <footer className="py-8 px-4 bg-coffee-900">
         <div className="container max-w-5xl mx-auto text-center">

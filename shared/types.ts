@@ -696,3 +696,30 @@ export interface ReadingCheckInHeatmapData {
   count: number
   durationMinutes: number
 }
+
+export interface GuestMessage {
+  id: number
+  nickname: string
+  content: string
+  createdAt: string
+  ip?: string
+}
+
+export interface CreateGuestMessageRequest {
+  nickname: string
+  content: string
+}
+
+export interface PaginatedGuestMessages {
+  messages: GuestMessage[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+}
+
+export interface GuestMessageStats {
+  total: number
+  todayCount: number
+  dailyLimit: number
+}

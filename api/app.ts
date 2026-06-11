@@ -20,6 +20,7 @@ import bookshelvesRoutes from './routes/bookshelves.js'
 import feedbacksRoutes from './routes/feedbacks.js'
 import starsRoutes from './routes/stars.js'
 import readingCheckInsRoutes from './routes/reading-checkins.js'
+import messagesRoutes from './routes/messages.js'
 
 // load env
 dotenv.config()
@@ -44,6 +45,7 @@ app.use('/api/bookshelves', bookshelvesRoutes)
 app.use('/api/feedbacks', feedbacksRoutes)
 app.use('/api/stars', starsRoutes)
 app.use('/api/reading-checkins', readingCheckInsRoutes)
+app.use('/api/messages', messagesRoutes)
 
 /**
  * health
