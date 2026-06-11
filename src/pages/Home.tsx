@@ -615,7 +615,9 @@ export default function Home() {
                     </div>
                     {meetup.discussionNotes && (
                       <p className="text-sm text-coffee-500 line-clamp-2 mt-2">
-                        {meetup.discussionNotes.slice(0, 80)}...
+                        {meetup.discussionNotes.length > 80
+                          ? meetup.discussionNotes.slice(0, 80) + '...'
+                          : meetup.discussionNotes}
                       </p>
                     )}
                   </Link>
