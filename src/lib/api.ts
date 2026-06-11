@@ -63,6 +63,12 @@ import type {
   CreateGuestMessageRequest,
   PaginatedGuestMessages,
   GuestMessageStats,
+  VoteCandidate,
+  VoteRecord,
+  VotingSession,
+  VotingSessionWithCandidates,
+  SubmitCandidatesRequest,
+  CastVoteRequest,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -266,6 +272,28 @@ export const meetupApi = {
     const query = params.toString()
     return request<(MeetupDiscussionPost & { meetupTitle?: string; meetupStatus?: string })[]>(`/meetups/discussion/hot?${query}`)
   },
+  submitCandidates: (id: number, data: SubmitCandidatesRequest) =>
+    request<{ session: VotingSession; candidates: VoteCandidate[] }>(`/meetups/${id}/voting/candidates`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getVoting: (id: number, nickname?: string) => {
+    const params = new URLSearchParams()
+    if (nickname) params.set('nickname', nickname)
+    const query = params.toString()
+    return request<VotingSessionWithCandidates>(`/meetups/${id}/voting${query ? `?${query}` : ''}`)
+  },
+  castVote: (id: number, data: CastVoteRequest) =>
+    request<{ vote: VoteRecord; candidate: VoteCandidate; session: VotingSessionWithCandidates }>(`/meetups/${id}/voting/vote`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  endVoting: (id: number) =>
+    request<{ session: VotingSession; voting: VotingSessionWithCandidates }>(`/meetups/${id}/voting/end`, {
+      method: 'POST',
+    }),
+  getVotingRecords: (id: number) =>
+    request<{ records: VoteRecord[]; total: number }>(`/meetups/${id}/voting/records`),
 }
 
 export const reservationApi = {

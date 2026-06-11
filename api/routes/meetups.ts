@@ -1,7 +1,7 @@
 import express from 'express'
 import QRCode from 'qrcode'
-import { getDB, addMeetup, registerMeetup, updateMeetupSummary, getPointsAccount, checkInMeetup, getCheckInsByMeetup, getMeetupCheckInStats, getMeetupDiscussionPosts, getMeetupDiscussionPostById, getMeetupDiscussionReplies, addMeetupDiscussionPost, addMeetupDiscussionReply, getHotMeetupDiscussionPosts } from '../db'
-import type { CreateMeetupRequest, RegisterMeetupRequest, UpdateMeetupSummaryRequest, CheckInRequest, CreateMeetupDiscussionPostRequest, CreateMeetupDiscussionReplyRequest } from '../../shared/types'
+import { getDB, addMeetup, registerMeetup, updateMeetupSummary, getPointsAccount, checkInMeetup, getCheckInsByMeetup, getMeetupCheckInStats, getMeetupDiscussionPosts, getMeetupDiscussionPostById, getMeetupDiscussionReplies, addMeetupDiscussionPost, addMeetupDiscussionReply, getHotMeetupDiscussionPosts, createVotingSession, getVotingSession, castVote, endVoting, getVoteRecordsByMeetup } from '../db'
+import type { CreateMeetupRequest, RegisterMeetupRequest, UpdateMeetupSummaryRequest, CheckInRequest, CreateMeetupDiscussionPostRequest, CreateMeetupDiscussionReplyRequest, SubmitCandidatesRequest, CastVoteRequest } from '../../shared/types'
 
 const router = express.Router()
 
@@ -262,6 +262,101 @@ router.get('/discussion/hot', (req, res) => {
     }
   })
   res.json(postsWithMeetup)
+})
+
+router.post('/:id/voting/candidates', (req, res) => {
+  const id = parseInt(req.params.id)
+  const body = req.body as SubmitCandidatesRequest
+
+  if (!body.submitter) {
+    res.status(400).json({ error: '请填写发起人昵称' })
+    return
+  }
+  if (!body.deadline) {
+    res.status(400).json({ error: '请设置投票截止时间' })
+    return
+  }
+  if (!body.candidates || body.candidates.length === 0) {
+    res.status(400).json({ error: '请提交候选书目' })
+    return
+  }
+
+  for (const c of body.candidates) {
+    if (!c.title || !c.author) {
+      res.status(400).json({ error: '每本候选书目都需要填写书名和作者' })
+      return
+    }
+  }
+
+  const result = createVotingSession(id, body.deadline, body.submitter, body.candidates)
+  if ('error' in result) {
+    res.status(400).json({ error: result.error })
+    return
+  }
+  res.status(201).json(result)
+})
+
+router.get('/:id/voting', (req, res) => {
+  const id = parseInt(req.params.id)
+  const { nickname } = req.query
+  const session = getVotingSession(id, typeof nickname === 'string' ? nickname : undefined)
+  if (!session) {
+    res.status(404).json({ error: '投票会话不存在' })
+    return
+  }
+  res.json(session)
+})
+
+router.post('/:id/voting/vote', (req, res) => {
+  const id = parseInt(req.params.id)
+  const body = req.body as CastVoteRequest
+
+  if (!body.nickname) {
+    res.status(400).json({ error: '请填写昵称' })
+    return
+  }
+  if (!body.candidateId) {
+    res.status(400).json({ error: '请选择候选书目' })
+    return
+  }
+
+  const result = castVote(id, body.nickname.trim(), body.candidateId)
+  if ('error' in result) {
+    res.status(400).json({ error: result.error })
+    return
+  }
+
+  const session = getVotingSession(id, body.nickname.trim())
+  res.status(201).json({ ...result, session })
+})
+
+router.post('/:id/voting/end', (req, res) => {
+  const id = parseInt(req.params.id)
+  const db = getDB()
+  const session = db.votingSessions.find(s => s.meetupId === id)
+  if (!session) {
+    res.status(404).json({ error: '投票会话不存在' })
+    return
+  }
+  const result = endVoting(session.id)
+  if ('error' in result) {
+    res.status(400).json({ error: result.error })
+    return
+  }
+  const updatedSession = getVotingSession(id)
+  res.json({ session: result, voting: updatedSession })
+})
+
+router.get('/:id/voting/records', (req, res) => {
+  const id = parseInt(req.params.id)
+  const db = getDB()
+  const meetup = db.meetups.find(m => m.id === id)
+  if (!meetup) {
+    res.status(404).json({ error: '读书会不存在' })
+    return
+  }
+  const records = getVoteRecordsByMeetup(id)
+  res.json({ records, total: records.length })
 })
 
 export default router

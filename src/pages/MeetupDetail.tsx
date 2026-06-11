@@ -27,6 +27,12 @@ import {
   ChevronUp,
   Reply,
   ImagePlus,
+  Vote,
+  Plus,
+  Minus,
+  Trophy,
+  TrendingUp,
+  AlertCircle,
 } from 'lucide-react'
 import { meetupApi, bookApi } from '@/lib/api'
 import {
@@ -37,8 +43,10 @@ import {
   formatDateTime,
   cn,
   formatDate,
+  votingStatusLabel,
+  votingStatusColor,
 } from '@/lib/utils'
-import type { Meetup, Registration, Book as BookType, ReaderLevel, CheckIn, MeetupCheckInStats, MeetupDiscussionPostWithReplies, MeetupDiscussionReply } from '../../shared/types'
+import type { Meetup, Registration, Book as BookType, ReaderLevel, CheckIn, MeetupCheckInStats, MeetupDiscussionPostWithReplies, MeetupDiscussionReply, VotingSessionWithCandidates, VoteCandidate, SubmitCandidatesRequest } from '../../shared/types'
 
 export default function MeetupDetail() {
   const { id } = useParams<{ id: string }>()
@@ -87,6 +95,20 @@ export default function MeetupDetail() {
   const [replyImages, setReplyImages] = useState('')
   const [submittingReply, setSubmittingReply] = useState(false)
 
+  const [votingSession, setVotingSession] = useState<VotingSessionWithCandidates | null>(null)
+  const [votingNickname, setVotingNickname] = useState('')
+  const [castingVote, setCastingVote] = useState(false)
+  const [showCandidateForm, setShowCandidateForm] = useState(false)
+  const [candidateSubmitter, setCandidateSubmitter] = useState('')
+  const [candidateDeadline, setCandidateDeadline] = useState('')
+  const [candidateBooks, setCandidateBooks] = useState<Array<{ title: string; author: string; coverImage: string; description: string }>>([
+    { title: '', author: '', coverImage: '', description: '' },
+    { title: '', author: '', coverImage: '', description: '' },
+    { title: '', author: '', coverImage: '', description: '' },
+  ])
+  const [submittingCandidates, setSubmittingCandidates] = useState(false)
+  const [endingVoting, setEndingVoting] = useState(false)
+
   const isAdmin = true
 
   const loadData = useCallback(async () => {
@@ -113,6 +135,7 @@ export default function MeetupDetail() {
       }
 
       loadDiscussionPosts()
+      loadVotingSession()
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
     } finally {
@@ -132,6 +155,15 @@ export default function MeetupDetail() {
     }
   }
 
+  async function loadVotingSession(nicknameArg?: string) {
+    try {
+      const data = await meetupApi.getVoting(Number(id), nicknameArg || votingNickname || undefined)
+      setVotingSession(data)
+    } catch {
+      setVotingSession(null)
+    }
+  }
+
   useEffect(() => {
     if (!id) return
     loadData()
@@ -146,6 +178,16 @@ export default function MeetupDetail() {
     }, 5000)
     return () => clearInterval(interval)
   }, [id])
+
+  useEffect(() => {
+    if (!id || !votingSession || votingSession.status !== 'voting') return
+    const interval = setInterval(() => {
+      meetupApi.getVoting(Number(id), votingNickname || undefined).then(data => {
+        setVotingSession(data)
+      }).catch(() => {})
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [id, votingSession?.status, votingNickname])
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
@@ -292,6 +334,101 @@ export default function MeetupDetail() {
 
   function togglePostExpand(postId: number) {
     setExpandedPostId(expandedPostId === postId ? null : postId)
+  }
+
+  async function handleSubmitCandidates(e: React.FormEvent) {
+    e.preventDefault()
+    if (!meetup) return
+
+    const validBooks = candidateBooks.filter(b => b.title.trim() && b.author.trim())
+    if (validBooks.length < 3 || validBooks.length > 5) {
+      alert('候选书目数量必须在 3-5 本之间')
+      return
+    }
+    if (!candidateSubmitter.trim()) {
+      alert('请填写发起人昵称')
+      return
+    }
+    if (!candidateDeadline) {
+      alert('请设置投票截止时间')
+      return
+    }
+
+    try {
+      setSubmittingCandidates(true)
+      await meetupApi.submitCandidates(meetup.id, {
+        submitter: candidateSubmitter.trim(),
+        deadline: new Date(candidateDeadline).toISOString(),
+        candidates: validBooks.map(b => ({
+          title: b.title.trim(),
+          author: b.author.trim(),
+          coverImage: b.coverImage.trim() || undefined,
+          description: b.description.trim() || undefined,
+        })),
+      })
+      setShowCandidateForm(false)
+      setCandidateSubmitter('')
+      setCandidateDeadline('')
+      setCandidateBooks([
+        { title: '', author: '', coverImage: '', description: '' },
+        { title: '', author: '', coverImage: '', description: '' },
+        { title: '', author: '', coverImage: '', description: '' },
+      ])
+      await loadData()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '提交失败')
+    } finally {
+      setSubmittingCandidates(false)
+    }
+  }
+
+  async function handleCastVote(candidateId: number) {
+    if (!meetup || !votingNickname.trim()) return
+
+    try {
+      setCastingVote(true)
+      await meetupApi.castVote(meetup.id, {
+        nickname: votingNickname.trim(),
+        candidateId,
+      })
+      await loadVotingSession(votingNickname.trim())
+      await loadData()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '投票失败')
+    } finally {
+      setCastingVote(false)
+    }
+  }
+
+  async function handleEndVoting() {
+    if (!meetup) return
+
+    try {
+      setEndingVoting(true)
+      await meetupApi.endVoting(meetup.id)
+      await loadVotingSession()
+      await loadData()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '结束投票失败')
+    } finally {
+      setEndingVoting(false)
+    }
+  }
+
+  function addCandidateBook() {
+    if (candidateBooks.length >= 5) return
+    setCandidateBooks([...candidateBooks, { title: '', author: '', coverImage: '', description: '' }])
+  }
+
+  function removeCandidateBook(index: number) {
+    if (candidateBooks.length <= 3) return
+    setCandidateBooks(candidateBooks.filter((_, i) => i !== index))
+  }
+
+  function updateCandidateBook(index: number, field: string, value: string) {
+    const updated = [...candidateBooks]
+    updated[index] = { ...updated[index], [field]: value }
+    setCandidateBooks(updated)
   }
 
   if (loading) {
@@ -810,6 +947,342 @@ export default function MeetupDetail() {
                 </>
               )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {isFinished && !votingSession && (
+        <div className="card p-6 border-2 border-dashed border-blue-300/50">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="section-title flex items-center gap-2 mb-0">
+              <Vote className="w-4 h-4 text-blue-500" />
+              <span className="text-blue-600">下期书目投票</span>
+              <span className="badge border bg-gray-50 text-gray-500 border-gray-200 ml-2">
+                未开始
+              </span>
+            </h3>
+            {isAdmin && (
+              <button
+                onClick={() => setShowCandidateForm(!showCandidateForm)}
+                className="btn-primary inline-flex items-center gap-2 text-sm"
+              >
+                <Plus className="w-4 h-4" />
+                发起投票
+              </button>
+            )}
+          </div>
+          <p className="text-coffee-500 text-sm">
+            活动已结束，发起人可提交 3-5 本候选图书供下期活动投票。
+          </p>
+
+          {showCandidateForm && (
+            <form onSubmit={handleSubmitCandidates} className="mt-5 space-y-4 p-5 rounded-xl bg-blue-50/50 border border-blue-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">发起人昵称 <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={candidateSubmitter}
+                    onChange={(e) => setCandidateSubmitter(e.target.value)}
+                    placeholder="请输入昵称"
+                    className="input-field"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label">投票截止时间 <span className="text-red-500">*</span></label>
+                  <input
+                    type="datetime-local"
+                    value={candidateDeadline}
+                    onChange={(e) => setCandidateDeadline(e.target.value)}
+                    className="input-field"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="label mb-0">候选书目 <span className="text-red-500">*</span>（3-5 本）</label>
+                  {candidateBooks.length < 5 && (
+                    <button
+                      type="button"
+                      onClick={addCandidateBook}
+                      className="text-sm text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      添加书目
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  {candidateBooks.map((book, index) => (
+                    <div key={index} className="p-4 rounded-lg bg-white border border-blue-100 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-coffee-700">候选书目 {index + 1}</span>
+                        {candidateBooks.length > 3 && (
+                          <button
+                            type="button"
+                            onClick={() => removeCandidateBook(index)}
+                            className="text-red-400 hover:text-red-600 transition-colors"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <input
+                            type="text"
+                            value={book.title}
+                            onChange={(e) => updateCandidateBook(index, 'title', e.target.value)}
+                            placeholder="书名"
+                            className="input-field text-sm"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="text"
+                            value={book.author}
+                            onChange={(e) => updateCandidateBook(index, 'author', e.target.value)}
+                            placeholder="作者"
+                            className="input-field text-sm"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        value={book.coverImage}
+                        onChange={(e) => updateCandidateBook(index, 'coverImage', e.target.value)}
+                        placeholder="封面图片 URL（选填）"
+                        className="input-field text-sm"
+                      />
+                      <input
+                        type="text"
+                        value={book.description}
+                        onChange={(e) => updateCandidateBook(index, 'description', e.target.value)}
+                        placeholder="简介（选填）"
+                        className="input-field text-sm"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={submittingCandidates}
+                  className={cn(
+                    'btn-primary inline-flex items-center gap-2',
+                    submittingCandidates && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  {submittingCandidates ? (
+                    <>提交中...</>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      提交候选书目
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCandidateForm(false)}
+                  className="btn-secondary inline-flex items-center gap-2"
+                >
+                  取消
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {votingSession && (
+        <div className="card p-6 border-2 border-blue-300/50">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <Vote className="w-5 h-5 text-blue-500" />
+              <h3 className="section-title mb-0">下期书目投票</h3>
+              <span className={cn('badge border ml-2', votingStatusColor[votingSession.status])}>
+                {votingStatusLabel[votingSession.status]}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              {votingSession.status === 'voting' && (
+                <span className="inline-flex items-center gap-1 text-xs text-blue-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  实时更新
+                </span>
+              )}
+              {isAdmin && votingSession.status === 'voting' && (
+                <button
+                  onClick={handleEndVoting}
+                  disabled={endingVoting}
+                  className="btn-secondary text-sm inline-flex items-center gap-1.5"
+                >
+                  {endingVoting ? '结束中...' : '结束投票'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 text-sm text-coffee-500 mb-5">
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-4 h-4" />
+              截止时间：{formatDateTime(votingSession.deadline)}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Users className="w-4 h-4" />
+              已投票：{votingSession.totalVotes} 人
+            </span>
+          </div>
+
+          {votingSession.status === 'ended' && votingSession.winningBookTitle && (
+            <div className="mb-5 p-4 rounded-xl bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-300/50">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center flex-shrink-0">
+                  <Trophy className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-amber-600 font-medium">下期共读书目已确定</p>
+                  <p className="text-lg font-bold text-amber-800 mt-0.5">《{votingSession.winningBookTitle}》</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {votingSession.status === 'voting' && !votingSession.userVotedCandidateId && (
+            <div className="mb-5">
+              <div className="flex items-center gap-3 mb-3">
+                <label className="label mb-0">您的昵称</label>
+                <input
+                  type="text"
+                  value={votingNickname}
+                  onChange={(e) => setVotingNickname(e.target.value)}
+                  placeholder="输入昵称后即可投票"
+                  className="input-field text-sm max-w-xs"
+                  onBlur={() => {
+                    if (votingNickname.trim()) loadVotingSession()
+                  }}
+                />
+              </div>
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 border border-blue-100 text-sm text-blue-700">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>每人限投 1 票，投票后不可更改，请慎重选择。</span>
+              </div>
+            </div>
+          )}
+
+          {votingSession.status === 'voting' && votingSession.userVotedCandidateId && (
+            <div className="mb-5 flex items-center gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-100 text-sm text-emerald-700">
+              <CheckCircle className="w-4 h-4 flex-shrink-0" />
+              <span>您已投票，感谢参与！结果将在投票截止后公布。</span>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {votingSession.candidates.map((candidate, index) => {
+              const isWinner = votingSession.status === 'ended' && candidate.id === votingSession.winningCandidateId
+              const isVoted = votingSession.userVotedCandidateId === candidate.id
+              const maxVotes = Math.max(...votingSession.candidates.map(c => c.voteCount), 1)
+              const progressPercent = votingSession.totalVotes > 0
+                ? Math.round((candidate.voteCount / votingSession.totalVotes) * 100)
+                : 0
+              const barWidth = votingSession.totalVotes > 0
+                ? (candidate.voteCount / maxVotes) * 100
+                : 0
+
+              return (
+                <div
+                  key={candidate.id}
+                  className={cn(
+                    'p-4 rounded-xl border-2 transition-all duration-200',
+                    isWinner
+                      ? 'border-amber-300 bg-gradient-to-r from-amber-50/80 to-yellow-50/50'
+                      : isVoted
+                      ? 'border-blue-200 bg-blue-50/30'
+                      : 'border-coffee-100 bg-white hover:border-coffee-200'
+                  )}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0">
+                      {isWinner ? (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center">
+                          <Trophy className="w-5 h-5 text-white" />
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-coffee-400 to-coffee-600 flex items-center justify-center">
+                          <span className="text-white text-sm font-bold">{index + 1}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h4 className="font-medium text-coffee-900 flex items-center gap-2">
+                            《{candidate.title}》
+                            {isWinner && (
+                              <span className="badge border bg-amber-100 text-amber-700 border-amber-300 text-xs">
+                                得票最高
+                              </span>
+                            )}
+                            {isVoted && (
+                              <span className="badge border bg-blue-100 text-blue-600 border-blue-200 text-xs">
+                                已投票
+                              </span>
+                            )}
+                          </h4>
+                          <p className="text-sm text-coffee-500 mt-0.5">{candidate.author}</p>
+                          {candidate.description && (
+                            <p className="text-xs text-coffee-400 mt-1 line-clamp-2">{candidate.description}</p>
+                          )}
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-lg font-bold text-coffee-800">{candidate.voteCount}</div>
+                          <div className="text-xs text-coffee-400">票</div>
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <div className="h-2 bg-coffee-100 rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              'h-full rounded-full transition-all duration-700',
+                              isWinner
+                                ? 'bg-gradient-to-r from-amber-400 to-yellow-500'
+                                : isVoted
+                                ? 'bg-gradient-to-r from-blue-400 to-blue-500'
+                                : 'bg-gradient-to-r from-coffee-400 to-coffee-500'
+                            )}
+                            style={{ width: `${barWidth}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-coffee-400 mt-1">{progressPercent}% 占比</p>
+                      </div>
+                    </div>
+                  </div>
+                  {votingSession.status === 'voting' && !votingSession.userVotedCandidateId && votingNickname.trim() && (
+                    <div className="mt-3 pt-3 border-t border-coffee-100">
+                      <button
+                        onClick={() => handleCastVote(candidate.id)}
+                        disabled={castingVote}
+                        className={cn(
+                          'btn-primary text-sm py-1.5 px-4 inline-flex items-center gap-1.5',
+                          castingVote && 'opacity-50 cursor-not-allowed'
+                        )}
+                      >
+                        <Vote className="w-3.5 h-3.5" />
+                        投一票
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

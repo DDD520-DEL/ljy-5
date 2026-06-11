@@ -140,6 +140,8 @@ export interface Meetup {
   coverImage?: string
   groupPhotos?: string[]
   discussionNotes?: string
+  votingSessionId?: number
+  nextBookTitle?: string
   createdAt: string
 }
 
@@ -722,4 +724,59 @@ export interface GuestMessageStats {
   total: number
   todayCount: number
   dailyLimit: number
+}
+
+export type VotingStatus = 'not_started' | 'voting' | 'ended'
+
+export interface VoteCandidate {
+  id: number
+  meetupId: number
+  title: string
+  author: string
+  coverImage?: string
+  description?: string
+  submitter: string
+  voteCount: number
+  createdAt: string
+}
+
+export interface VoteRecord {
+  id: number
+  meetupId: number
+  candidateId: number
+  nickname: string
+  createdAt: string
+}
+
+export interface VotingSession {
+  id: number
+  meetupId: number
+  status: VotingStatus
+  deadline: string
+  winningCandidateId?: number
+  winningBookTitle?: string
+  createdAt: string
+  endedAt?: string
+}
+
+export interface VotingSessionWithCandidates extends VotingSession {
+  candidates: VoteCandidate[]
+  totalVotes: number
+  userVotedCandidateId?: number
+}
+
+export interface SubmitCandidatesRequest {
+  candidates: Array<{
+    title: string
+    author: string
+    coverImage?: string
+    description?: string
+  }>
+  deadline: string
+  submitter: string
+}
+
+export interface CastVoteRequest {
+  nickname: string
+  candidateId: number
 }

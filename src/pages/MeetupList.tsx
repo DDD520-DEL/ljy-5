@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, MapPin, Users, Plus, Filter, CalendarDays } from 'lucide-react'
+import { Calendar, MapPin, Users, Plus, Filter, CalendarDays, BookCheck } from 'lucide-react'
 import { meetupApi } from '@/lib/api'
 import { meetupStatusLabel, meetupStatusColor, formatDate, cn } from '@/lib/utils'
 import type { Meetup, MeetupStatus } from '../../shared/types'
@@ -125,7 +125,13 @@ export default function MeetupList() {
                       <CalendarDays className="w-16 h-16 text-coffee-300" />
                     </div>
                   )}
-                  <div className="absolute top-3 right-3">
+                  <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                    {meetup.nextBookTitle && (
+                      <span className="badge border bg-emerald-50 text-emerald-700 border-emerald-200 inline-flex items-center gap-1">
+                        <BookCheck className="w-3 h-3" />
+                        下期书目已定
+                      </span>
+                    )}
                     <span className={cn('badge border', meetupStatusColor[meetup.status])}>
                       {meetupStatusLabel[meetup.status]}
                     </span>
@@ -152,6 +158,13 @@ export default function MeetupList() {
                   <p className="text-sm text-coffee-500 line-clamp-2 min-h-[2.5rem]">
                     {meetup.description}
                   </p>
+
+                  {meetup.nextBookTitle && (
+                    <div className="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50/50 px-3 py-1.5 rounded-lg border border-emerald-100">
+                      <BookCheck className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">下期共读：《{meetup.nextBookTitle}》</span>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">

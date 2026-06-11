@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { SourceType, MeetupStatus, ReaderLevel, PointsActionType, DonationReviewStatus, NoteVisibility, TraceLog } from '../../shared/types'
+import type { SourceType, MeetupStatus, ReaderLevel, PointsActionType, DonationReviewStatus, NoteVisibility, TraceLog, VotingStatus } from '../../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../../shared/types'
 
 export function cn(...inputs: ClassValue[]) {
@@ -185,6 +185,18 @@ export function getLevelProgress(points: number): { currentLevel: ReaderLevel; n
 
   const progress = ((points - currentLevelMin) / (nextLevelMin - currentLevelMin)) * 100
   return { currentLevel, nextLevel, progress: Math.min(progress, 100), minPoints: currentLevelMin, maxPoints: nextLevelMin }
+}
+
+export const votingStatusLabel: Record<VotingStatus, string> = {
+  not_started: '未开始',
+  voting: '投票中',
+  ended: '已结束',
+}
+
+export const votingStatusColor: Record<VotingStatus, string> = {
+  not_started: 'bg-gray-100 text-gray-600 border-gray-200',
+  voting: 'bg-blue-50 text-blue-700 border-blue-200',
+  ended: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 }
 
 export const noteVisibilityLabel: Record<NoteVisibility, string> = {

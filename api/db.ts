@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat, Bookshelf, BookshelfBook, BookshelfLike, BookshelfVisibility, CreateBookshelfRequest, UpdateBookshelfRequest, BookshelfWithBooks, BookshelfWithOwner, RatingStats, Feedback, FeedbackType, FeedbackStatus, CreateFeedbackRequest, UpdateFeedbackStatusRequest, MonthlyStar, MonthlyStarsResult, StarType, ReadingCheckIn, CreateReadingCheckInRequest, ReadingCheckInStats, ReadingCheckInHeatmapData, GuestMessage } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat, Bookshelf, BookshelfBook, BookshelfLike, BookshelfVisibility, CreateBookshelfRequest, UpdateBookshelfRequest, BookshelfWithBooks, BookshelfWithOwner, RatingStats, Feedback, FeedbackType, FeedbackStatus, CreateFeedbackRequest, UpdateFeedbackStatusRequest, MonthlyStar, MonthlyStarsResult, StarType, ReadingCheckIn, CreateReadingCheckInRequest, ReadingCheckInStats, ReadingCheckInHeatmapData, GuestMessage, VoteCandidate, VoteRecord, VotingSession, VotingStatus } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -436,6 +436,9 @@ export interface Database {
   monthlyStars: MonthlyStar[]
   readingCheckIns: ReadingCheckIn[]
   guestMessages: GuestMessage[]
+  voteCandidates: VoteCandidate[]
+  voteRecords: VoteRecord[]
+  votingSessions: VotingSession[]
   nextBookId: number
   nextTraceLogId: number
   nextReviewId: number
@@ -462,6 +465,9 @@ export interface Database {
   nextMonthlyStarId: number
   nextReadingCheckInId: number
   nextGuestMessageId: number
+  nextVoteCandidateId: number
+  nextVoteRecordId: number
+  nextVotingSessionId: number
 }
 
 const initialCheckIns: CheckIn[] = [
@@ -725,6 +731,9 @@ const initialDB: Database = {
   monthlyStars: initialMonthlyStars,
   readingCheckIns: initialReadingCheckIns,
   guestMessages: initialGuestMessages,
+  voteCandidates: [],
+  voteRecords: [],
+  votingSessions: [],
   nextBookId: 8,
   nextTraceLogId: 9,
   nextReviewId: 9,
@@ -751,6 +760,9 @@ const initialDB: Database = {
   nextMonthlyStarId: 11,
   nextReadingCheckInId: 9,
   nextGuestMessageId: 7,
+  nextVoteCandidateId: 1,
+  nextVoteRecordId: 1,
+  nextVotingSessionId: 1,
 }
 
 let db: Database = initialDB
@@ -890,6 +902,27 @@ function loadDB(): Database {
       
       if (parsed.nextGuestMessageId === undefined) {
         parsed.nextGuestMessageId = (parsed.guestMessages?.length || 0) + 1
+      }
+      
+      if (!parsed.voteCandidates) {
+        parsed.voteCandidates = []
+        parsed.voteRecords = []
+        parsed.votingSessions = []
+        parsed.nextVoteCandidateId = 1
+        parsed.nextVoteRecordId = 1
+        parsed.nextVotingSessionId = 1
+        saveDB(parsed as Database)
+        console.log('[DB Migration] 初始化投票数据')
+      }
+      
+      if (parsed.nextVoteCandidateId === undefined) {
+        parsed.nextVoteCandidateId = (parsed.voteCandidates?.length || 0) + 1
+      }
+      if (parsed.nextVoteRecordId === undefined) {
+        parsed.nextVoteRecordId = (parsed.voteRecords?.length || 0) + 1
+      }
+      if (parsed.nextVotingSessionId === undefined) {
+        parsed.nextVotingSessionId = (parsed.votingSessions?.length || 0) + 1
       }
       
       console.log(`[DB] 已从 ${DATA_FILE} 加载数据`)
@@ -2342,6 +2375,159 @@ export function getHotMeetupDiscussionPosts(limit: number = 10, days?: number): 
       return hotB - hotA
     })
     .slice(0, limit)
+}
+
+export function createVotingSession(
+  meetupId: number,
+  deadline: string,
+  submitter: string,
+  candidatesData: Array<{ title: string; author: string; coverImage?: string; description?: string }>
+): { session: VotingSession; candidates: VoteCandidate[] } | { error: string } {
+  const meetup = db.meetups.find(m => m.id === meetupId)
+  if (!meetup) return { error: '读书会不存在' }
+
+  if (meetup.status !== 'finished') return { error: '只有已结束的读书会才能发起下期书目投票' }
+
+  const existingSession = db.votingSessions.find(s => s.meetupId === meetupId)
+  if (existingSession) return { error: '该读书会已存在投票会话' }
+
+  if (candidatesData.length < 3 || candidatesData.length > 5) {
+    return { error: '候选书目数量必须在 3-5 本之间' }
+  }
+
+  const now = new Date().toISOString()
+  const session: VotingSession = {
+    id: db.nextVotingSessionId++,
+    meetupId,
+    status: 'voting',
+    deadline,
+    createdAt: now,
+  }
+  db.votingSessions.push(session)
+
+  const candidates: VoteCandidate[] = candidatesData.map(c => ({
+    id: db.nextVoteCandidateId++,
+    meetupId,
+    title: c.title,
+    author: c.author,
+    coverImage: c.coverImage,
+    description: c.description,
+    submitter,
+    voteCount: 0,
+    createdAt: now,
+  }))
+  db.voteCandidates.push(...candidates)
+
+  meetup.votingSessionId = session.id
+
+  persistDB()
+  console.log(`[Voting] 创建投票会话: 读书会${meetupId}, 候选书目${candidates.length}本`)
+  return { session, candidates }
+}
+
+export function getVotingSession(meetupId: number, nickname?: string): (VotingSession & {
+  candidates: VoteCandidate[]
+  totalVotes: number
+  userVotedCandidateId?: number
+}) | null {
+  const session = db.votingSessions.find(s => s.meetupId === meetupId)
+  if (!session) return null
+
+  checkAndAutoEndVoting(session.id)
+
+  const candidates = db.voteCandidates
+    .filter(c => c.meetupId === meetupId)
+    .sort((a, b) => b.voteCount - a.voteCount || a.id - b.id)
+
+  const totalVotes = db.voteRecords.filter(r => r.meetupId === meetupId).length
+
+  let userVotedCandidateId: number | undefined
+  if (nickname) {
+    const userVote = db.voteRecords.find(r => r.meetupId === meetupId && r.nickname === nickname)
+    if (userVote) userVotedCandidateId = userVote.candidateId
+  }
+
+  const currentSession = db.votingSessions.find(s => s.id === session.id)!
+  return { ...currentSession, candidates, totalVotes, userVotedCandidateId }
+}
+
+export function castVote(meetupId: number, nickname: string, candidateId: number): { vote: VoteRecord; candidate: VoteCandidate } | { error: string } {
+  const session = db.votingSessions.find(s => s.meetupId === meetupId)
+  if (!session) return { error: '投票会话不存在' }
+
+  checkAndAutoEndVoting(session.id)
+  const currentSession = db.votingSessions.find(s => s.id === session.id)!
+  if (currentSession.status !== 'voting') return { error: '投票已结束' }
+
+  const existingVote = db.voteRecords.find(r => r.meetupId === meetupId && r.nickname === nickname)
+  if (existingVote) return { error: '您已投过票，每人限投一票' }
+
+  const candidate = db.voteCandidates.find(c => c.id === candidateId && c.meetupId === meetupId)
+  if (!candidate) return { error: '候选书目不存在' }
+
+  const now = new Date().toISOString()
+  const vote: VoteRecord = {
+    id: db.nextVoteRecordId++,
+    meetupId,
+    candidateId,
+    nickname,
+    createdAt: now,
+  }
+  db.voteRecords.push(vote)
+  candidate.voteCount++
+
+  persistDB()
+  console.log(`[Voting] 用户 ${nickname} 投票给候选书目#${candidateId}`)
+  return { vote, candidate }
+}
+
+export function checkAndAutoEndVoting(sessionId: number): VotingSession | null {
+  const session = db.votingSessions.find(s => s.id === sessionId)
+  if (!session || session.status !== 'voting') return null
+
+  const now = new Date()
+  const deadline = new Date(session.deadline)
+
+  if (now >= deadline) {
+    return endVoting(sessionId)
+  }
+  return session
+}
+
+export function endVoting(sessionId: number): VotingSession | { error: string } {
+  const session = db.votingSessions.find(s => s.id === sessionId)
+  if (!session) return { error: '投票会话不存在' }
+  if (session.status === 'ended') return session
+
+  const candidates = db.voteCandidates
+    .filter(c => c.meetupId === session.meetupId)
+    .sort((a, b) => b.voteCount - a.voteCount)
+
+  if (candidates.length > 0) {
+    const winner = candidates[0]
+    session.status = 'ended'
+    session.winningCandidateId = winner.id
+    session.winningBookTitle = winner.title
+    session.endedAt = new Date().toISOString()
+
+    const meetup = db.meetups.find(m => m.id === session.meetupId)
+    if (meetup) {
+      meetup.nextBookTitle = winner.title
+    }
+  } else {
+    session.status = 'ended'
+    session.endedAt = new Date().toISOString()
+  }
+
+  persistDB()
+  console.log(`[Voting] 投票结束: 会话#${sessionId}, 胜出: ${session.winningBookTitle || '无'}`)
+  return session
+}
+
+export function getVoteRecordsByMeetup(meetupId: number): VoteRecord[] {
+  return db.voteRecords
+    .filter(r => r.meetupId === meetupId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 }
 
 export function createBookshelf(data: CreateBookshelfRequest): Bookshelf {
