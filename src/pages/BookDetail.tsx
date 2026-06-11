@@ -32,6 +32,7 @@ import {
   Megaphone,
   CalendarClock,
   Tag,
+  Download,
 } from 'lucide-react'
 import { bookApi, reservationApi, noteApi } from '@/lib/api'
 import { BookshelfSelector } from '@/components/BookshelfSelector'
@@ -992,39 +993,50 @@ export default function BookDetail() {
 
         <div className="lg:col-span-5 space-y-6">
           <div className="card p-6">
-            <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-2 border-b border-coffee-100">
-              <button
-                onClick={() => setDetailTab('trace')}
-                className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 whitespace-nowrap',
-                  detailTab === 'trace'
-                    ? 'bg-coffee-700 text-white shadow-md'
-                    : 'text-coffee-500 hover:text-coffee-700 hover:bg-coffee-50'
-                )}
-              >
-                <Clock className="w-4 h-4" />
-                流转历史
-              </button>
-              <button
-                onClick={() => setDetailTab('notes')}
-                className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 whitespace-nowrap',
-                  detailTab === 'notes'
-                    ? 'bg-coffee-700 text-white shadow-md'
-                    : 'text-coffee-500 hover:text-coffee-700 hover:bg-coffee-50'
-                )}
-              >
-                <PenLine className="w-4 h-4" />
-                读者笔记
-                {notes.filter(n => n.visibility === 'public').length > 0 && (
-                  <span className={cn(
-                    'px-1.5 py-0.5 rounded-full text-xs',
-                    detailTab === 'notes' ? 'bg-white/20' : 'bg-coffee-100'
-                  )}>
-                    {notes.filter(n => n.visibility === 'public').length}
-                  </span>
-                )}
-              </button>
+            <div className="flex items-center justify-between gap-2 mb-5 border-b border-coffee-100">
+              <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                <button
+                  onClick={() => setDetailTab('trace')}
+                  className={cn(
+                    'px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 whitespace-nowrap',
+                    detailTab === 'trace'
+                      ? 'bg-coffee-700 text-white shadow-md'
+                      : 'text-coffee-500 hover:text-coffee-700 hover:bg-coffee-50'
+                  )}
+                >
+                  <Clock className="w-4 h-4" />
+                  流转历史
+                </button>
+                <button
+                  onClick={() => setDetailTab('notes')}
+                  className={cn(
+                    'px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 whitespace-nowrap',
+                    detailTab === 'notes'
+                      ? 'bg-coffee-700 text-white shadow-md'
+                      : 'text-coffee-500 hover:text-coffee-700 hover:bg-coffee-50'
+                  )}
+                >
+                  <PenLine className="w-4 h-4" />
+                  读者笔记
+                  {notes.filter(n => n.visibility === 'public').length > 0 && (
+                    <span className={cn(
+                      'px-1.5 py-0.5 rounded-full text-xs',
+                      detailTab === 'notes' ? 'bg-white/20' : 'bg-coffee-100'
+                    )}>
+                      {notes.filter(n => n.visibility === 'public').length}
+                    </span>
+                  )}
+                </button>
+              </div>
+              {detailTab === 'trace' && traceLogs.length > 0 && (
+                <button
+                  onClick={() => book && bookApi.exportTrace(book.id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-coffee-50 text-coffee-700 hover:bg-coffee-100 transition-colors flex-shrink-0"
+                >
+                  <Download className="w-4 h-4" />
+                  导出日志
+                </button>
+              )}
             </div>
 
             {detailTab === 'trace' && (

@@ -154,6 +154,16 @@ export const bookApi = {
     request<TagStat[]>('/books/tags/stats'),
   recommend: (nickname: string, limit: number = 6) =>
     request<RecommendResult>(`/books/recommend?nickname=${encodeURIComponent(nickname)}&limit=${limit}`),
+  exportBooks: (params?: { category?: string; source?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.category) qs.set('category', params.category)
+    if (params?.source) qs.set('source', params.source)
+    const query = qs.toString()
+    window.open(`${API_BASE}/books/export${query ? `?${query}` : ''}`, '_blank')
+  },
+  exportTrace: (bookId: number) => {
+    window.open(`${API_BASE}/books/${bookId}/trace/export`, '_blank')
+  },
 }
 
 export const traceApi = {

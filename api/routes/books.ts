@@ -1,7 +1,8 @@
 import express from 'express'
 import QRCode from 'qrcode'
+import XLSX from 'xlsx'
 import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower, getReviewsWithLevel, addPoints, getPointsRanking, getBorrowRanking, getReaderProfile, createBorrowRecord, getBookBorrowStatusDetail, sendReminder, getAllActiveBorrowRecords, getAllOverdueRecords, getNotifications, markNotificationRead, markAllNotificationsRead, getTagStats, getRecommendedBooks, getRatingStats, enrichBookWithRating } from '../db'
-import type { CreateBookRequest, CreateReviewRequest, ReaderRanking, TagStat, RecommendResult, RatingStats } from '../../shared/types'
+import type { CreateBookRequest, CreateReviewRequest, ReaderRanking, TagStat, RecommendResult, RatingStats, Book, TraceLog } from '../../shared/types'
 
 const router = express.Router()
 
@@ -118,6 +119,132 @@ router.get('/borrow/active', (req, res) => {
 router.get('/borrow/overdue', (req, res) => {
   const records = getAllOverdueRecords()
   res.json(records)
+})
+
+const sourceTypeLabel: Record<string, string> = {
+  donation: '个人捐赠',
+  direct: '出版社直供',
+  secondhand: '二手回收',
+}
+
+function formatDateTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+router.get('/export', (req, res) => {
+  const db = getDB()
+  const { category, source } = req.query
+
+  let books: Book[] = [...db.books]
+
+  if (category && typeof category === 'string') {
+    books = books.filter(b => b.category === category)
+  }
+  if (source && typeof source === 'string') {
+    books = books.filter(b => b.sourceType === source)
+  }
+
+  const exportData = books.map(book => ({
+    '书名': book.title,
+    '作者': book.author,
+    'ISBN': book.isbn || '',
+    '出版社': book.publisher || '',
+    '分类': book.category,
+    '来源类型': sourceTypeLabel[book.sourceType] || book.sourceType,
+    '来源说明': book.sourceInfo || '',
+    '入库时间': formatDateTime(book.createdAt),
+    '借阅次数': book.borrowCount,
+    '评论数': book.discussCount,
+    '溯源ID': book.traceId,
+    '标签': book.tags ? book.tags.join(', ') : '',
+  }))
+
+  const worksheet = XLSX.utils.json_to_sheet(exportData)
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, '图书数据')
+
+  const colWidths = [
+    { wch: 30 },
+    { wch: 15 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 25 },
+    { wch: 20 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 20 },
+    { wch: 20 },
+  ]
+  worksheet['!cols'] = colWidths
+
+  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+  const fileName = `图书数据_${new Date().toISOString().slice(0, 10)}.xlsx`
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`)
+  res.send(buffer)
+})
+
+router.get('/:id/trace/export', (req, res) => {
+  const db = getDB()
+  const id = parseInt(req.params.id)
+  const book = db.books.find(b => b.id === id)
+  if (!book) {
+    res.status(404).json({ error: '图书不存在' })
+    return
+  }
+
+  const traceLogs: TraceLog[] = db.traceLogs
+    .filter(l => l.bookId === id)
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+
+  const exportData = traceLogs.map(log => ({
+    '序号': log.id,
+    '操作类型': log.action,
+    '操作描述': log.description,
+    '操作时间': formatDateTime(log.timestamp),
+    '操作人': log.operator || '',
+  }))
+
+  const worksheet = XLSX.utils.json_to_sheet(exportData)
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, '溯源日志')
+
+  const colWidths = [
+    { wch: 8 },
+    { wch: 12 },
+    { wch: 40 },
+    { wch: 20 },
+    { wch: 15 },
+  ]
+  worksheet['!cols'] = colWidths
+
+  const bookInfoSheet = XLSX.utils.json_to_sheet([
+    { '项目': '书名', '内容': book.title },
+    { '项目': '作者', '内容': book.author },
+    { '项目': 'ISBN', '内容': book.isbn || '' },
+    { '项目': '分类', '内容': book.category },
+    { '项目': '溯源ID', '内容': book.traceId },
+    { '项目': '日志总数', '内容': traceLogs.length },
+  ])
+  XLSX.utils.book_append_sheet(workbook, bookInfoSheet, '图书信息')
+  bookInfoSheet['!cols'] = [{ wch: 12 }, { wch: 40 }]
+
+  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+  const fileName = `溯源日志_${book.title}_${new Date().toISOString().slice(0, 10)}.xlsx`
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`)
+  res.send(buffer)
 })
 
 router.get('/:id/rating-stats', (req, res) => {

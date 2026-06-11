@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus, Star, User, Heart, PenLine, Flame, AlertTriangle, Megaphone, CheckCircle, CalendarClock, AlertCircle, MessageCircle, Coffee } from 'lucide-react'
+import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus, Star, User, Heart, PenLine, Flame, AlertTriangle, Megaphone, CheckCircle, CalendarClock, AlertCircle, MessageCircle, Coffee, Download, X, FileSpreadsheet, Tag } from 'lucide-react'
 import { bookApi, meetupApi, reservationApi, noteApi, feedbackApi } from '@/lib/api'
 import { formatDate, sourceTypeLabel, sourceTypeColor, meetupStatusLabel, meetupStatusColor, readerLevelLabel, readerLevelColor, cn, calculateDaysRemaining } from '@/lib/utils'
 import type { Book as BookType, Meetup, ReaderRanking, Note, BorrowRecordWithBook, MeetupDiscussionPost } from '../../shared/types'
@@ -22,6 +22,10 @@ export default function Dashboard() {
   const [reminderSuccess, setReminderSuccess] = useState<number | null>(null)
   const [hotDiscussionPosts, setHotDiscussionPosts] = useState<(MeetupDiscussionPost & { meetupTitle?: string; meetupStatus?: string })[]>([])
   const [feedbackStats, setFeedbackStats] = useState({ total: 0, pending: 0, processing: 0, resolved: 0, rejected: 0 })
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportCategory, setExportCategory] = useState<string>('all')
+  const [exportSource, setExportSource] = useState<string>('all')
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -172,6 +176,35 @@ export default function Dashboard() {
 
   const ranking = rankType === 'borrow' ? borrowRanking : discussRanking
 
+  const categories = useMemo(() => {
+    const set = new Set(books.map((b) => b.category))
+    return ['all', ...Array.from(set)]
+  }, [books])
+
+  const sourceOptions = [
+    { value: 'all', label: '全部来源' },
+    { value: 'donation', label: '个人捐赠' },
+    { value: 'direct', label: '出版社直供' },
+    { value: 'secondhand', label: '二手回收' },
+  ]
+
+  async function handleExport() {
+    try {
+      setExporting(true)
+      const params: { category?: string; source?: string } = {}
+      if (exportCategory !== 'all') params.category = exportCategory
+      if (exportSource !== 'all') params.source = exportSource
+      bookApi.exportBooks(params)
+      setTimeout(() => {
+        setShowExportModal(false)
+        setExporting(false)
+      }, 500)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '导出失败')
+      setExporting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -189,9 +222,18 @@ export default function Dashboard() {
           <h1 className="page-title">欢迎回来 👋</h1>
           <p className="text-coffee-500 mt-1">今天是个读书的好日子</p>
         </div>
-        <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-coffee-50 to-brass-400/10 border border-coffee-100">
-          <Sparkles className="w-4 h-4 text-brass-500" />
-          <span className="text-sm text-coffee-700">墨香书坊 · 让每本书都有故事</span>
+        <div className="flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-coffee-50 to-brass-400/10 border border-coffee-100">
+            <Sparkles className="w-4 h-4 text-brass-500" />
+            <span className="text-sm text-coffee-700">墨香书坊 · 让每本书都有故事</span>
+          </div>
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-coffee-600 to-coffee-800 text-white text-sm font-medium hover:from-coffee-700 hover:to-coffee-900 transition-all duration-200 shadow-lg shadow-coffee-500/20"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">数据导出</span>
+          </button>
         </div>
       </div>
 
@@ -833,6 +875,150 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => !exporting && setShowExportModal(false)}
+          />
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-coffee-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-coffee-500 to-coffee-700 flex items-center justify-center">
+                  <FileSpreadsheet className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-serif font-bold text-coffee-900">数据导出</h2>
+                  <p className="text-sm text-coffee-500">导出图书数据为 Excel 文件</p>
+                </div>
+              </div>
+              <button
+                onClick={() => !exporting && setShowExportModal(false)}
+                disabled={exporting}
+                className="p-2 rounded-lg hover:bg-coffee-50 transition-colors text-coffee-400 hover:text-coffee-600 disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-coffee-800 mb-2.5">
+                  导出范围
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExportCategory('all')}
+                    className={cn(
+                      'flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 font-medium',
+                      exportCategory === 'all'
+                        ? 'border-coffee-500 bg-coffee-50 text-coffee-800'
+                        : 'border-coffee-100 hover:border-coffee-200 text-coffee-500 hover:text-coffee-600'
+                    )}
+                  >
+                    <Book className="w-4 h-4" />
+                    全部图书
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (categories.length > 1) {
+                        setExportCategory(categories[1])
+                      }
+                    }}
+                    className={cn(
+                      'flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 font-medium',
+                      exportCategory !== 'all'
+                        ? 'border-coffee-500 bg-coffee-50 text-coffee-800'
+                        : 'border-coffee-100 hover:border-coffee-200 text-coffee-500 hover:text-coffee-600'
+                    )}
+                  >
+                    <Tag className="w-4 h-4" />
+                    按分类筛选
+                  </button>
+                </div>
+              </div>
+
+              {exportCategory !== 'all' && (
+                <div>
+                  <label className="block text-sm font-medium text-coffee-800 mb-2.5">
+                    选择分类
+                  </label>
+                  <select
+                    value={exportCategory}
+                    onChange={(e) => setExportCategory(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-coffee-100 bg-white transition-all duration-200 focus:outline-none focus:border-coffee-500 focus:ring-4 focus:ring-coffee-500/10 text-coffee-800"
+                  >
+                    {categories.filter(c => c !== 'all').map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-coffee-800 mb-2.5">
+                  来源类型 <span className="text-coffee-400 font-normal">（可选）</span>
+                </label>
+                <select
+                  value={exportSource}
+                  onChange={(e) => setExportSource(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-coffee-100 bg-white transition-all duration-200 focus:outline-none focus:border-coffee-500 focus:ring-4 focus:ring-coffee-500/10 text-coffee-800"
+                >
+                  {sourceOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-coffee-50 rounded-xl p-4 border border-coffee-100">
+                <p className="text-sm font-medium text-coffee-800 mb-2">导出字段说明</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-coffee-600">
+                  <span>• 书名</span>
+                  <span>• 作者</span>
+                  <span>• ISBN</span>
+                  <span>• 分类</span>
+                  <span>• 来源类型</span>
+                  <span>• 入库时间</span>
+                  <span>• 借阅次数</span>
+                  <span>• 评论数</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowExportModal(false)}
+                  disabled={exporting}
+                  className="flex-1 px-4 py-3 rounded-xl border-2 border-coffee-200 text-coffee-600 font-medium hover:bg-coffee-50 transition-colors disabled:opacity-50"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExport}
+                  disabled={exporting}
+                  className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-coffee-600 to-coffee-800 text-white font-medium hover:from-coffee-700 hover:to-coffee-900 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-coffee-500/20"
+                >
+                  {exporting ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      导出中...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      导出 Excel
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
