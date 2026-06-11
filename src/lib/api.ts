@@ -49,6 +49,11 @@ import type {
   UpdateBookshelfRequest,
   ReaderLevel,
   RatingStats,
+  Feedback,
+  FeedbackType,
+  FeedbackStatus,
+  CreateFeedbackRequest,
+  UpdateFeedbackStatusRequest,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -410,5 +415,31 @@ export const bookshelfApi = {
     request<{ bookshelf: Bookshelf; liked: boolean }>(`/bookshelves/${id}/like`, {
       method: 'POST',
       body: JSON.stringify({ nickname }),
+    }),
+}
+
+export const feedbackApi = {
+  submit: (data: CreateFeedbackRequest) =>
+    request<{ feedback: Feedback }>('/feedbacks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  stats: () =>
+    request<{ total: number; pending: number; processing: number; resolved: number; rejected: number }>('/feedbacks/stats'),
+  list: (params?: { status?: FeedbackStatus; type?: FeedbackType }) => {
+    const qs = new URLSearchParams()
+    if (params?.status) qs.set('status', params.status)
+    if (params?.type) qs.set('type', params.type)
+    const query = qs.toString()
+    return request<Feedback[]>(`/feedbacks/all${query ? `?${query}` : ''}`)
+  },
+  get: (id: number) =>
+    request<Feedback>(`/feedbacks/${id}`),
+  getByUser: (nickname: string) =>
+    request<Feedback[]>(`/feedbacks/user/${encodeURIComponent(nickname)}`),
+  updateStatus: (id: number, data: UpdateFeedbackStatusRequest) =>
+    request<{ feedback: Feedback }>(`/feedbacks/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     }),
 }

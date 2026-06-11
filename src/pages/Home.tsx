@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom'
-import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, ChevronRight, BookMarked, Star, User, Tag, Eye, Globe } from 'lucide-react'
-import NotificationCenter from '@/components/NotificationCenter'
 import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
+import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, ChevronRight, BookMarked, Star, User, Tag, Eye, Globe, MessageSquare } from 'lucide-react'
+import FeedbackModal from '@/components/FeedbackModal'
+import NotificationCenter from '@/components/NotificationCenter'
 import { bookApi, bookshelfApi } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { Book as BookType, Bookshelf } from '../../shared/types'
@@ -15,6 +16,7 @@ export default function Home() {
   const [recommendLoading, setRecommendLoading] = useState(true)
   const [popularBookshelves, setPopularBookshelves] = useState<Bookshelf[]>([])
   const [bookshelvesLoading, setBookshelvesLoading] = useState(true)
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
 
   useEffect(() => {
     async function loadRecommendations() {
@@ -549,11 +551,26 @@ export default function Home() {
             <BookOpen className="w-5 h-5 text-brass-400" />
             <span className="font-serif font-bold text-white">墨香书坊</span>
           </div>
-          <p className="text-coffee-300 text-sm">
+          <div className="flex items-center justify-center gap-6 mb-4">
+            <button
+              onClick={() => setShowFeedbackModal(true)}
+              className="inline-flex items-center gap-1.5 text-sm text-coffee-300 hover:text-brass-400 transition-colors"
+            >
+              <MessageSquare className="w-4 h-4" />
+              意见反馈
+            </button>
+          </div>
+          <p className="text-coffee-400 text-xs">
             © 2026 墨香书坊 · 让每一本书都有故事
           </p>
         </div>
       </footer>
+
+      <FeedbackModal
+        isOpen={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        defaultNickname={nickname}
+      />
     </div>
   )
 }

@@ -590,3 +590,47 @@ export interface AddBookToBookshelfRequest {
 export interface ToggleBookshelfLikeRequest {
   nickname: string
 }
+
+export type FeedbackType = 'feature' | 'bug' | 'other'
+
+export const FEEDBACK_TYPES: Record<FeedbackType, { label: string; color: string }> = {
+  feature: { label: '功能建议', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  bug: { label: 'Bug 上报', color: 'bg-red-100 text-red-700 border-red-200' },
+  other: { label: '其他', color: 'bg-gray-100 text-gray-700 border-gray-200' },
+}
+
+export type FeedbackStatus = 'pending' | 'processing' | 'resolved' | 'rejected'
+
+export const FEEDBACK_STATUS: Record<FeedbackStatus, { label: string; color: string }> = {
+  pending: { label: '待处理', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  processing: { label: '处理中', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  resolved: { label: '已解决', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  rejected: { label: '不予处理', color: 'bg-gray-100 text-gray-700 border-gray-200' },
+}
+
+export interface Feedback {
+  id: number
+  type: FeedbackType
+  content: string
+  contact?: string
+  nickname?: string
+  status: FeedbackStatus
+  reply?: string
+  repliedAt?: string
+  repliedBy?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateFeedbackRequest {
+  type: FeedbackType
+  content: string
+  contact?: string
+  nickname?: string
+}
+
+export interface UpdateFeedbackStatusRequest {
+  status: FeedbackStatus
+  reply?: string
+  operator?: string
+}

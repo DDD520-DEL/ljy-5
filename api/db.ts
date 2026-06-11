@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat, Bookshelf, BookshelfBook, BookshelfLike, BookshelfVisibility, CreateBookshelfRequest, UpdateBookshelfRequest, BookshelfWithBooks, BookshelfWithOwner, RatingStats } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat, Bookshelf, BookshelfBook, BookshelfLike, BookshelfVisibility, CreateBookshelfRequest, UpdateBookshelfRequest, BookshelfWithBooks, BookshelfWithOwner, RatingStats, Feedback, FeedbackType, FeedbackStatus, CreateFeedbackRequest, UpdateFeedbackStatusRequest } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -389,6 +389,7 @@ export interface Database {
   bookshelves: Bookshelf[]
   bookshelfBooks: BookshelfBook[]
   bookshelfLikes: BookshelfLike[]
+  feedbacks: Feedback[]
   nextBookId: number
   nextTraceLogId: number
   nextReviewId: number
@@ -411,6 +412,7 @@ export interface Database {
   nextBookshelfId: number
   nextBookshelfBookId: number
   nextBookshelfLikeId: number
+  nextFeedbackId: number
 }
 
 const initialCheckIns: CheckIn[] = [
@@ -639,6 +641,7 @@ const initialDB: Database = {
   bookshelves: initialBookshelves,
   bookshelfBooks: initialBookshelfBooks,
   bookshelfLikes: initialBookshelfLikes,
+  feedbacks: [],
   nextBookId: 6,
   nextTraceLogId: 9,
   nextReviewId: 9,
@@ -661,6 +664,7 @@ const initialDB: Database = {
   nextBookshelfId: 5,
   nextBookshelfBookId: 9,
   nextBookshelfLikeId: 26,
+  nextFeedbackId: 1,
 }
 
 let db: Database = initialDB
@@ -758,9 +762,20 @@ function loadDB(): Database {
         parsed.nextBookshelfLikeId = (parsed.bookshelfLikes?.length || 0) + 1
       }
       
+      if (!parsed.feedbacks) {
+        parsed.feedbacks = []
+        parsed.nextFeedbackId = 1
+        saveDB(parsed as Database)
+        console.log('[DB Migration] 初始化意见反馈数据')
+      }
+      
+      if (parsed.nextFeedbackId === undefined) {
+        parsed.nextFeedbackId = (parsed.feedbacks?.length || 0) + 1
+      }
+      
       console.log(`[DB] 已从 ${DATA_FILE} 加载数据`)
       console.log(`[DB] 图书: ${parsed.books?.length || 0} 本 | 读书会: ${parsed.meetups?.length || 0} 个 | 短评: ${parsed.reviews?.length || 0} 条 | 笔记: ${parsed.notes?.length || 0} 条`)
-      console.log(`[DB] 借阅记录: ${parsed.borrowRecords?.length || 0} 条 | 通知: ${parsed.notifications?.length || 0} 条 | 讨论帖: ${parsed.meetupDiscussionPosts?.length || 0} 条 | 书单: ${parsed.bookshelves?.length || 0} 个`)
+      console.log(`[DB] 借阅记录: ${parsed.borrowRecords?.length || 0} 条 | 通知: ${parsed.notifications?.length || 0} 条 | 讨论帖: ${parsed.meetupDiscussionPosts?.length || 0} 条 | 书单: ${parsed.bookshelves?.length || 0} 个 | 反馈: ${parsed.feedbacks?.length || 0} 条`)
       return parsed as Database
     } catch (err) {
       console.error('[DB] 数据文件读取失败，使用初始数据:', err)
@@ -2525,4 +2540,68 @@ export function enrichBookWithRating(book: Book): Book & { averageRating: number
     ? Math.round((bookReviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount) * 10) / 10
     : 0
   return { ...book, averageRating, reviewCount }
+}
+
+export function createFeedback(data: CreateFeedbackRequest): Feedback {
+  const now = new Date().toISOString()
+  const feedback: Feedback = {
+    id: db.nextFeedbackId++,
+    type: data.type,
+    content: data.content,
+    contact: data.contact,
+    nickname: data.nickname,
+    status: 'pending',
+    createdAt: now,
+    updatedAt: now,
+  }
+  db.feedbacks.push(feedback)
+  persistDB()
+  console.log(`[Feedback] 新反馈: #${feedback.id} (${data.type})`)
+  return feedback
+}
+
+export function getAllFeedbacks(filters?: { status?: FeedbackStatus; type?: FeedbackType }): Feedback[] {
+  let feedbacks = [...db.feedbacks]
+  if (filters) {
+    if (filters.status) feedbacks = feedbacks.filter(f => f.status === filters.status)
+    if (filters.type) feedbacks = feedbacks.filter(f => f.type === filters.type)
+  }
+  return feedbacks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+export function getFeedbackById(id: number): Feedback | null {
+  return db.feedbacks.find(f => f.id === id) || null
+}
+
+export function getFeedbacksByNickname(nickname: string): Feedback[] {
+  return db.feedbacks
+    .filter(f => f.nickname === nickname)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+export function updateFeedbackStatus(id: number, data: UpdateFeedbackStatusRequest): Feedback | null {
+  const feedback = db.feedbacks.find(f => f.id === id)
+  if (!feedback) return null
+  
+  feedback.status = data.status
+  feedback.updatedAt = new Date().toISOString()
+  
+  if (data.status === 'resolved' && data.reply) {
+    feedback.reply = data.reply
+    feedback.repliedAt = new Date().toISOString()
+    feedback.repliedBy = data.operator || '管理员'
+  }
+  
+  persistDB()
+  console.log(`[Feedback] 更新状态: #${id} -> ${data.status}`)
+  return feedback
+}
+
+export function getFeedbackStats(): { total: number; pending: number; processing: number; resolved: number; rejected: number } {
+  const stats = { total: 0, pending: 0, processing: 0, resolved: 0, rejected: 0 }
+  for (const f of db.feedbacks) {
+    stats.total++
+    stats[f.status]++
+  }
+  return stats
 }

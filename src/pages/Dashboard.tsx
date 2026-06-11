@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus, Star, User, Heart, PenLine, Flame, AlertTriangle, Megaphone, CheckCircle, CalendarClock, AlertCircle, MessageCircle, Coffee } from 'lucide-react'
-import { bookApi, meetupApi, reservationApi, noteApi } from '@/lib/api'
-import { formatDate, sourceTypeLabel, sourceTypeColor, meetupStatusLabel, meetupStatusColor, readerLevelLabel, readerLevelColor, cn, calculateDaysRemaining, formatDateTime } from '@/lib/utils'
+import { bookApi, meetupApi, reservationApi, noteApi, feedbackApi } from '@/lib/api'
+import { formatDate, sourceTypeLabel, sourceTypeColor, meetupStatusLabel, meetupStatusColor, readerLevelLabel, readerLevelColor, cn, calculateDaysRemaining } from '@/lib/utils'
 import type { Book as BookType, Meetup, ReaderRanking, Note, BorrowRecordWithBook, MeetupDiscussionPost } from '../../shared/types'
 
 export default function Dashboard() {
@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [sendingReminders, setSendingReminders] = useState<Record<number, boolean>>({})
   const [reminderSuccess, setReminderSuccess] = useState<number | null>(null)
   const [hotDiscussionPosts, setHotDiscussionPosts] = useState<(MeetupDiscussionPost & { meetupTitle?: string; meetupStatus?: string })[]>([])
+  const [feedbackStats, setFeedbackStats] = useState({ total: 0, pending: 0, processing: 0, resolved: 0, rejected: 0 })
 
   useEffect(() => {
     loadData()
@@ -28,7 +29,7 @@ export default function Dashboard() {
 
   async function loadData() {
     try {
-      const [allBooks, borrowRank, discussRank, allMeetups, resStats, pointsRank, borrowCountRank, hotNotesData, activeBorrowsData, overdueBorrowsData, hotDiscussionPostsData] = await Promise.all([
+      const [allBooks, borrowRank, discussRank, allMeetups, resStats, pointsRank, borrowCountRank, hotNotesData, activeBorrowsData, overdueBorrowsData, hotDiscussionPostsData, fbStats] = await Promise.all([
         bookApi.list(),
         bookApi.ranking('borrow'),
         bookApi.ranking('discuss'),
@@ -40,6 +41,7 @@ export default function Dashboard() {
         bookApi.getActiveBorrows(),
         bookApi.getOverdueBorrows(),
         meetupApi.getHotDiscussionPosts(5, 7),
+        feedbackApi.stats(),
       ])
       setBooks(allBooks)
       setBorrowRanking(borrowRank)
@@ -52,6 +54,7 @@ export default function Dashboard() {
       setActiveBorrows(activeBorrowsData)
       setOverdueBorrows(overdueBorrowsData)
       setHotDiscussionPosts(hotDiscussionPostsData)
+      setFeedbackStats(fbStats)
     } catch (err) {
       console.error(err)
     } finally {
@@ -130,6 +133,41 @@ export default function Dashboard() {
       gradient: overdueBorrows.length > 0 ? 'from-red-500 to-red-700' : 'from-gray-400 to-gray-600',
       bg: overdueBorrows.length > 0 ? 'bg-red-50' : 'bg-gray-50',
     },
+    {
+      label: '反馈总数',
+      value: feedbackStats.total,
+      icon: MessageSquare,
+      gradient: 'from-indigo-500 to-indigo-700',
+      bg: 'bg-indigo-50',
+    },
+    {
+      label: '待处理',
+      value: feedbackStats.pending,
+      icon: Clock,
+      gradient: feedbackStats.pending > 0 ? 'from-amber-500 to-amber-700' : 'from-gray-400 to-gray-600',
+      bg: feedbackStats.pending > 0 ? 'bg-amber-50' : 'bg-gray-50',
+    },
+    {
+      label: '处理中',
+      value: feedbackStats.processing,
+      icon: AlertCircle,
+      gradient: feedbackStats.processing > 0 ? 'from-blue-500 to-blue-700' : 'from-gray-400 to-gray-600',
+      bg: feedbackStats.processing > 0 ? 'bg-blue-50' : 'bg-gray-50',
+    },
+    {
+      label: '已解决',
+      value: feedbackStats.resolved,
+      icon: CheckCircle,
+      gradient: 'from-emerald-500 to-emerald-700',
+      bg: 'bg-emerald-50',
+    },
+    {
+      label: '不予处理',
+      value: feedbackStats.rejected,
+      icon: AlertTriangle,
+      gradient: 'from-gray-500 to-gray-700',
+      bg: 'bg-gray-50',
+    },
   ]
 
   const ranking = rankType === 'borrow' ? borrowRanking : discussRanking
@@ -157,7 +195,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
         {stats.map((stat) => (
           <div
             key={stat.label}
@@ -177,6 +215,24 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {feedbackStats.pending > 0 && (
+        <Link
+          to="/feedbacks"
+          className="card p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 hover:shadow-md transition-all group"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0">
+              <MessageSquare className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-coffee-900">有新的意见反馈待处理</p>
+              <p className="text-sm text-coffee-600">当前有 <span className="font-bold text-amber-600">{feedbackStats.pending}</span> 条反馈等待处理</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-coffee-400 group-hover:text-coffee-600 transition-colors" />
+          </div>
+        </Link>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3 card p-6">

@@ -18,6 +18,7 @@ import ExchangeCreate from "@/pages/ExchangeCreate";
 import ExchangeDetail from "@/pages/ExchangeDetail";
 import ExchangeManage from "@/pages/ExchangeManage";
 import BookshelfDetail from "@/pages/BookshelfDetail";
+import FeedbackManage from "@/pages/FeedbackManage";
 
 export default function App() {
   return (
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="/exchanges/new" element={<ExchangeCreate />} />
           <Route path="/exchanges/:id" element={<ExchangeDetail />} />
           <Route path="/exchanges/manage" element={<ExchangeManage />} />
+          <Route path="/feedbacks" element={<FeedbackManage />} />
         </Route>
       </Routes>
     </Router>
