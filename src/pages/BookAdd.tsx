@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { BookPlus, Upload, CheckCircle, QrCode, ArrowRight, X, Clock, Gift } from 'lucide-react'
+import { BookPlus, Upload, CheckCircle, QrCode, ArrowRight, X, Clock, Gift, Plus, Tag } from 'lucide-react'
 import { bookApi, donationApi } from '@/lib/api'
 import { sourceTypeLabel, cn } from '@/lib/utils'
 import type { SourceType, CreateBookRequest } from '../../shared/types'
 
-type FormState = Omit<CreateBookRequest, 'sourceType'> & { sourceType: SourceType; donor: string; donorContact: string }
+type FormState = Omit<CreateBookRequest, 'sourceType'> & { sourceType: SourceType; donor: string; donorContact: string; tagInput: string }
 
 const initialForm: FormState = {
   title: '',
@@ -17,8 +17,10 @@ const initialForm: FormState = {
   sourceInfo: '',
   coverImage: '',
   description: '',
+  tags: [],
   donor: '',
   donorContact: '',
+  tagInput: '',
 }
 
 export default function BookAdd() {
@@ -408,6 +410,59 @@ export default function BookAdd() {
               value={form.description}
               onChange={(e) => handleChange('description', e.target.value)}
             />
+          </div>
+          <div>
+            <label className="label">自定义标签</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="input-field flex-1"
+                placeholder="输入标签后按回车添加，如「治愈系」「入门友好」"
+                value={form.tagInput}
+                onChange={(e) => handleChange('tagInput', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    const tag = form.tagInput.trim()
+                    if (tag && !(form.tags || []).includes(tag)) {
+                      setForm(prev => ({ ...prev, tags: [...(prev.tags || []), tag], tagInput: '' }))
+                    }
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const tag = form.tagInput.trim()
+                  if (tag && !(form.tags || []).includes(tag)) {
+                    setForm(prev => ({ ...prev, tags: [...(prev.tags || []), tag], tagInput: '' }))
+                  }
+                }}
+                className="btn-secondary px-3 flex items-center gap-1"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+            {(form.tags || []).length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {(form.tags || []).map((tag, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r from-coffee-50 to-brass-400/10 text-coffee-700 border border-coffee-200"
+                  >
+                    <Tag className="w-3 h-3" />
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, tags: (prev.tags || []).filter((_, i) => i !== idx) }))}
+                      className="ml-1 text-coffee-400 hover:text-coffee-700 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

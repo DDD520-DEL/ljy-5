@@ -36,6 +36,7 @@ export interface Book {
   sourceInfo?: string
   coverImage?: string
   description?: string
+  tags?: string[]
   createdAt: string
   borrowCount: number
   discussCount: number
@@ -191,7 +192,18 @@ export interface CreateBookRequest {
   sourceInfo?: string
   coverImage?: string
   description?: string
+  tags?: string[]
   donor?: string
+}
+
+export interface TagStat {
+  tag: string
+  count: number
+}
+
+export interface RecommendResult {
+  books: Book[]
+  reason: string
 }
 
 export interface CreateReviewRequest {

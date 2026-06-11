@@ -1,13 +1,34 @@
 import { Link } from 'react-router-dom'
-import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, ChevronRight, BookMarked, Star, User } from 'lucide-react'
+import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, ChevronRight, BookMarked, Star, User, Tag, Eye } from 'lucide-react'
 import NotificationCenter from '@/components/NotificationCenter'
 import { useState, useEffect, useRef } from 'react'
+import { bookApi } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import type { Book as BookType } from '../../shared/types'
 
 export default function Home() {
   const [nickname, setNickname] = useState<string>('爱读书的猫')
   const [showUserMenu, setShowUserMenu] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const [recommendBooks, setRecommendBooks] = useState<BookType[]>([])
+  const [recommendReason, setRecommendReason] = useState('')
+  const [recommendLoading, setRecommendLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadRecommendations() {
+      try {
+        setRecommendLoading(true)
+        const result = await bookApi.recommend(nickname, 6)
+        setRecommendBooks(result.books)
+        setRecommendReason(result.reason)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setRecommendLoading(false)
+      }
+    }
+    loadRecommendations()
+  }, [nickname])
 
   const readerNicknames = [
     '爱读书的猫',
@@ -232,6 +253,95 @@ export default function Home() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+      
+      <section className="py-20 px-4 bg-gradient-to-b from-coffee-50 to-white">
+        <div className="container max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm border border-coffee-200 mb-4 shadow-sm">
+              <Sparkles className="w-4 h-4 text-brass-500" />
+              <span className="text-sm text-coffee-700">个性化推荐</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-serif font-bold text-coffee-900 mb-3">
+              猜你喜欢
+            </h2>
+            <p className="text-coffee-600 max-w-xl mx-auto">
+              {recommendReason || '根据您的阅读偏好为您精选'}
+            </p>
+          </div>
+
+          {recommendLoading ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="aspect-[3/4] bg-coffee-100 rounded-lg mb-2" />
+                  <div className="h-4 bg-coffee-100 rounded w-3/4 mb-1" />
+                  <div className="h-3 bg-coffee-100 rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : recommendBooks.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {recommendBooks.map((book) => (
+                <Link
+                  key={book.id}
+                  to={`/books/${book.id}`}
+                  className="group"
+                >
+                  <div className="aspect-[3/4] rounded-xl overflow-hidden bg-coffee-100 mb-3 relative shadow-sm group-hover:shadow-lg transition-all duration-300 group-hover:-translate-y-1">
+                    {book.coverImage ? (
+                      <img
+                        src={book.coverImage}
+                        alt={book.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-coffee-300">
+                        <BookOpen className="w-8 h-8" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  </div>
+                  <h4 className="font-medium text-coffee-900 text-sm truncate group-hover:text-coffee-700 transition-colors">
+                    {book.title}
+                  </h4>
+                  <p className="text-xs text-coffee-500 truncate mt-0.5">{book.author}</p>
+                  {book.tags && book.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {book.tags.slice(0, 2).map((tag) => (
+                        <span key={tag} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-coffee-50 text-coffee-600 border border-coffee-100">
+                          <Tag className="w-2.5 h-2.5" />
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 mt-1.5 text-xs text-coffee-400">
+                    <span className="flex items-center gap-0.5">
+                      <Eye className="w-3 h-3" />
+                      {book.borrowCount}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <BookOpen className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+              <p className="text-coffee-400">暂无推荐，快去借阅几本书吧</p>
+            </div>
+          )}
+
+          <div className="text-center mt-8">
+            <Link
+              to="/books"
+              className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium text-coffee-700 border border-coffee-300 rounded-xl hover:bg-coffee-50 transition-all duration-300"
+            >
+              浏览全部馆藏
+              <ChevronRight className="w-4 h-4" />
+            </Link>
           </div>
         </div>
       </section>

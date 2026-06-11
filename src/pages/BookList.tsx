@@ -1,24 +1,35 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
-import { Search, Filter, Plus, Book, Grid3X3, List, Eye, MessageSquare } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Search, Filter, Plus, Book, Grid3X3, List, Eye, MessageSquare, Tag, X } from 'lucide-react'
 import { bookApi } from '@/lib/api'
 import { sourceTypeLabel, sourceTypeColor, cn } from '@/lib/utils'
-import type { Book as BookType, SourceType } from '../../shared/types'
+import type { Book as BookType, SourceType, TagStat } from '../../shared/types'
 
 type SourceFilter = 'all' | SourceType
 type ViewMode = 'grid' | 'list'
 
 export default function BookList() {
+  const [searchParams] = useSearchParams()
   const [books, setBooks] = useState<BookType[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [tagStats, setTagStats] = useState<TagStat[]>([])
+  const [selectedTag, setSelectedTag] = useState<string | null>(null)
 
   useEffect(() => {
     loadBooks()
+    loadTagStats()
   }, [])
+
+  useEffect(() => {
+    const tagParam = searchParams.get('tag')
+    if (tagParam) {
+      setSelectedTag(tagParam)
+    }
+  }, [searchParams])
 
   async function loadBooks() {
     try {
@@ -32,6 +43,15 @@ export default function BookList() {
     }
   }
 
+  async function loadTagStats() {
+    try {
+      const stats = await bookApi.tagStats()
+      setTagStats(stats)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   const categories = useMemo(() => {
     const set = new Set(books.map((b) => b.category))
     return ['all', ...Array.from(set)]
@@ -41,6 +61,7 @@ export default function BookList() {
     return books.filter((book) => {
       if (sourceFilter !== 'all' && book.sourceType !== sourceFilter) return false
       if (categoryFilter !== 'all' && book.category !== categoryFilter) return false
+      if (selectedTag && (!book.tags || !book.tags.includes(selectedTag))) return false
       if (search) {
         const keyword = search.toLowerCase()
         const matchTitle = book.title.toLowerCase().includes(keyword)
@@ -50,7 +71,7 @@ export default function BookList() {
       }
       return true
     })
-  }, [books, sourceFilter, categoryFilter, search])
+  }, [books, sourceFilter, categoryFilter, search, selectedTag])
 
   const sourceOptions: { value: SourceFilter; label: string }[] = [
     { value: 'all', label: '全部来源' },
@@ -185,6 +206,55 @@ export default function BookList() {
         </div>
       </div>
 
+      {tagStats.length > 0 && (
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Tag className="w-4 h-4 text-coffee-500" />
+            <h3 className="text-sm font-medium text-coffee-700">标签云</h3>
+            {selectedTag && (
+              <button
+                onClick={() => setSelectedTag(null)}
+                className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-coffee-700 text-white hover:bg-coffee-800 transition-colors"
+              >
+                {selectedTag}
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2 items-center">
+            {tagStats.map((stat) => {
+              const minSize = 0.75
+              const maxSize = 1.5
+              const maxCount = Math.max(...tagStats.map(s => s.count))
+              const ratio = maxCount > 1 ? (stat.count - 1) / (maxCount - 1) : 0
+              const size = minSize + ratio * (maxSize - minSize)
+              const isSelected = selectedTag === stat.tag
+              return (
+                <button
+                  key={stat.tag}
+                  onClick={() => setSelectedTag(isSelected ? null : stat.tag)}
+                  className={cn(
+                    'inline-flex items-center gap-1 px-3 py-1.5 rounded-full transition-all duration-200 border',
+                    isSelected
+                      ? 'bg-coffee-700 text-white border-coffee-700 shadow-sm'
+                      : 'bg-gradient-to-r from-coffee-50 to-brass-400/5 text-coffee-700 border-coffee-200 hover:border-coffee-400 hover:shadow-sm'
+                  )}
+                  style={{ fontSize: `${size}rem` }}
+                >
+                  {stat.tag}
+                  <span className={cn(
+                    'text-xs px-1.5 py-0.5 rounded-full',
+                    isSelected ? 'bg-white/20' : 'bg-coffee-100 text-coffee-500'
+                  )}>
+                    {stat.count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {filteredBooks.length === 0 ? (
         <div className="card p-12 text-center">
           <div className="w-16 h-16 rounded-full bg-coffee-50 flex items-center justify-center mx-auto mb-4">
@@ -251,6 +321,18 @@ function BookCardGrid({ book }: { book: BookType }) {
         {book.title}
       </h3>
       <p className="text-sm text-coffee-500 mt-0.5 truncate">{book.author}</p>
+      {book.tags && book.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {book.tags.slice(0, 3).map((tag) => (
+            <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gradient-to-r from-coffee-50 to-brass-400/10 text-coffee-600 border border-coffee-100">
+              {tag}
+            </span>
+          ))}
+          {book.tags.length > 3 && (
+            <span className="text-[10px] px-1.5 py-0.5 text-coffee-400">+{book.tags.length - 3}</span>
+          )}
+        </div>
+      )}
       <div className="flex items-center justify-between mt-3">
         <span className="text-xs text-coffee-400 bg-coffee-50 px-2 py-1 rounded">
           {book.category}
@@ -304,6 +386,18 @@ function BookCardList({ book }: { book: BookType }) {
             {sourceTypeLabel[book.sourceType]}
           </span>
         </div>
+        {book.tags && book.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {book.tags.slice(0, 4).map((tag) => (
+              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gradient-to-r from-coffee-50 to-brass-400/10 text-coffee-600 border border-coffee-100">
+                {tag}
+              </span>
+            ))}
+            {book.tags.length > 4 && (
+              <span className="text-[10px] px-1 py-0.5 text-coffee-400">+{book.tags.length - 4}</span>
+            )}
+          </div>
+        )}
         <div className="flex-1" />
         <div className="flex items-center justify-between mt-3">
           <span className="text-xs text-coffee-400 bg-coffee-50 px-2 py-1 rounded">

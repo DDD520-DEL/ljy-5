@@ -1,13 +1,13 @@
 import express from 'express'
 import QRCode from 'qrcode'
-import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower, getReviewsWithLevel, addPoints, getPointsRanking, getBorrowRanking, getReaderProfile, createBorrowRecord, getBookBorrowStatusDetail, sendReminder, getAllActiveBorrowRecords, getAllOverdueRecords, getNotifications, markNotificationRead, markAllNotificationsRead } from '../db'
-import type { CreateBookRequest, CreateReviewRequest, ReaderRanking } from '../../shared/types'
+import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower, getReviewsWithLevel, addPoints, getPointsRanking, getBorrowRanking, getReaderProfile, createBorrowRecord, getBookBorrowStatusDetail, sendReminder, getAllActiveBorrowRecords, getAllOverdueRecords, getNotifications, markNotificationRead, markAllNotificationsRead, getTagStats, getRecommendedBooks } from '../db'
+import type { CreateBookRequest, CreateReviewRequest, ReaderRanking, TagStat, RecommendResult } from '../../shared/types'
 
 const router = express.Router()
 
 router.get('/', (req, res) => {
   const db = getDB()
-  const { source, category, search, _sort, _order } = req.query
+  const { source, category, search, tag, _sort, _order } = req.query
   
   let books = [...db.books]
   
@@ -16,6 +16,9 @@ router.get('/', (req, res) => {
   }
   if (category && typeof category === 'string') {
     books = books.filter(b => b.category === category)
+  }
+  if (tag && typeof tag === 'string') {
+    books = books.filter(b => b.tags && b.tags.includes(tag as string))
   }
   if (search && typeof search === 'string') {
     const keyword = search.toLowerCase()
@@ -57,6 +60,22 @@ router.get('/readers/ranking', (req, res) => {
     ranking = getPointsRanking(limitNum)
   }
   res.json(ranking)
+})
+
+router.get('/tags/stats', (_req, res) => {
+  const stats = getTagStats()
+  res.json(stats)
+})
+
+router.get('/recommend', (req, res) => {
+  const { nickname, limit = '6' } = req.query
+  if (!nickname || typeof nickname !== 'string') {
+    res.status(400).json({ error: '缺少 nickname 参数' })
+    return
+  }
+  const limitNum = parseInt(limit as string) || 6
+  const result = getRecommendedBooks(decodeURIComponent(nickname), limitNum)
+  res.json(result)
 })
 
 router.get('/readers/:nickname', (req, res) => {

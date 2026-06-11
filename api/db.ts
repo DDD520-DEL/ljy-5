@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -32,6 +32,7 @@ const initialBooks: Book[] = [
     sourceInfo: '读者李先生捐赠，书龄10年',
     coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=book%20cover%20hundred%20years%20of%20solitude%20magical%20realism%20latin%20america&image_size=portrait_4_3',
     description: '魔幻现实主义文学的代表作，描写了布恩迪亚家族七代人的传奇故事',
+    tags: ['魔幻现实', '经典文学', '拉美文学', '深度阅读'],
     createdAt: '2025-11-15T10:00:00.000Z',
     borrowCount: 23,
     discussCount: 5
@@ -48,6 +49,7 @@ const initialBooks: Book[] = [
     sourceInfo: '出版社直供，2024年新版',
     coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=little%20prince%20book%20cover%20starry%20night%20rose%20fox%20illustration&image_size=portrait_4_3',
     description: '一部为成年人写的童话，关于爱与责任的寓言',
+    tags: ['治愈系', '入门友好', '童话', '经典文学'],
     createdAt: '2025-12-01T14:30:00.000Z',
     borrowCount: 45,
     discussCount: 8
@@ -64,6 +66,7 @@ const initialBooks: Book[] = [
     sourceInfo: '二手回收，品相良好',
     coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=kite%20runner%20book%20cover%20afghanistan%20kite%20sky%20warm%20colors&image_size=portrait_4_3',
     description: '关于友谊、背叛与救赎的感人故事',
+    tags: ['催泪', '入门友好', '战争文学', '治愈系'],
     createdAt: '2025-10-20T09:15:00.000Z',
     borrowCount: 31,
     discussCount: 6
@@ -80,6 +83,7 @@ const initialBooks: Book[] = [
     sourceInfo: '出版社直供，精装版',
     coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=sapiens%20brief%20history%20humankind%20book%20cover%20evolution%20human%20history&image_size=portrait_4_3',
     description: '从认知革命到科学革命，重新审视人类历史',
+    tags: ['入门友好', '历史社科', '冷门佳作', '深度阅读'],
     createdAt: '2026-01-05T16:00:00.000Z',
     borrowCount: 18,
     discussCount: 3
@@ -96,6 +100,7 @@ const initialBooks: Book[] = [
     sourceInfo: '读者张女士捐赠，1998年版本',
     coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=to%20live%20yu%20hua%20book%20cover%20chinese%20rural%20life%20sepia%20tone&image_size=portrait_4_3',
     description: '讲述了农村人福贵悲惨的人生遭遇',
+    tags: ['催泪', '经典文学', '中国文学', '深度阅读'],
     createdAt: '2025-09-10T11:45:00.000Z',
     borrowCount: 52,
     discussCount: 12
@@ -2087,4 +2092,90 @@ export function deleteMeetupDiscussionPost(id: number): boolean {
   persistDB()
   console.log(`[MeetupDiscussion] 删除讨论帖: ID ${id}`)
   return true
+}
+
+export function getTagStats(): TagStat[] {
+  const tagMap = new Map<string, number>()
+  for (const book of db.books) {
+    if (book.tags && book.tags.length > 0) {
+      for (const tag of book.tags) {
+        tagMap.set(tag, (tagMap.get(tag) || 0) + 1)
+      }
+    }
+  }
+  return Array.from(tagMap.entries())
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+export function getRecommendedBooks(nickname: string, limit: number = 6): { books: Book[]; reason: string } {
+  const userTags = new Map<string, number>()
+
+  const borrowHistory = db.traceLogs
+    .filter(l => l.action === '借出' && l.description.includes(nickname))
+    .map(l => db.books.find(b => b.id === l.bookId))
+    .filter((b): b is Book => b !== undefined)
+
+  for (const book of borrowHistory) {
+    if (book.tags) {
+      for (const tag of book.tags) {
+        userTags.set(tag, (userTags.get(tag) || 0) + 2)
+      }
+    }
+  }
+
+  const userReviews = db.reviews.filter(r => r.nickname === nickname)
+  for (const review of userReviews) {
+    const book = db.books.find(b => b.id === review.bookId)
+    if (book?.tags) {
+      for (const tag of book.tags) {
+        userTags.set(tag, (userTags.get(tag) || 0) + 1)
+      }
+    }
+  }
+
+  const borrowedBookIds = new Set(borrowHistory.map(b => b.id))
+
+  if (userTags.size === 0) {
+    const popularBooks = [...db.books]
+      .filter(b => !borrowedBookIds.has(b.id))
+      .sort((a, b) => b.borrowCount - a.borrowCount)
+      .slice(0, limit)
+    return { books: popularBooks, reason: '根据热门借阅为您推荐' }
+  }
+
+  const scored = db.books
+    .filter(b => !borrowedBookIds.has(b.id))
+    .map(book => {
+      let score = 0
+      if (book.tags) {
+        for (const tag of book.tags) {
+          score += userTags.get(tag) || 0
+        }
+      }
+      score += book.borrowCount * 0.1
+      return { book, score }
+    })
+    .filter(s => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(s => s.book)
+
+  if (scored.length === 0) {
+    const popularBooks = [...db.books]
+      .filter(b => !borrowedBookIds.has(b.id))
+      .sort((a, b) => b.borrowCount - a.borrowCount)
+      .slice(0, limit)
+    return { books: popularBooks, reason: '根据热门借阅为您推荐' }
+  }
+
+  const topTags = Array.from(userTags.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([tag]) => tag)
+
+  return {
+    books: scored,
+    reason: `根据您偏好的「${topTags.join('」「')}」标签推荐`,
+  }
 }

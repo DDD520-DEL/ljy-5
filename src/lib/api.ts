@@ -40,6 +40,8 @@ import type {
   MeetupDiscussionPostWithReplies,
   CreateMeetupDiscussionPostRequest,
   CreateMeetupDiscussionReplyRequest,
+  TagStat,
+  RecommendResult,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -60,11 +62,12 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export const bookApi = {
-  list: (params?: { source?: string; category?: string; search?: string }) => {
+  list: (params?: { source?: string; category?: string; search?: string; tag?: string }) => {
     const qs = new URLSearchParams()
     if (params?.source) qs.set('source', params.source)
     if (params?.category) qs.set('category', params.category)
     if (params?.search) qs.set('search', params.search)
+    if (params?.tag) qs.set('tag', params.tag)
     const query = qs.toString()
     return request<Book[]>(`/books${query ? `?${query}` : ''}`)
   },
@@ -133,6 +136,10 @@ export const bookApi = {
     request<BorrowRecordWithBook[]>('/books/borrow/active'),
   getOverdueBorrows: () =>
     request<BorrowRecordWithBook[]>('/books/borrow/overdue'),
+  tagStats: () =>
+    request<TagStat[]>('/books/tags/stats'),
+  recommend: (nickname: string, limit: number = 6) =>
+    request<RecommendResult>(`/books/recommend?nickname=${encodeURIComponent(nickname)}&limit=${limit}`),
 }
 
 export const traceApi = {

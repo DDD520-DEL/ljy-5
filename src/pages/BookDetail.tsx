@@ -31,6 +31,7 @@ import {
   AlertTriangle,
   Megaphone,
   CalendarClock,
+  Tag,
 } from 'lucide-react'
 import { bookApi, reservationApi, noteApi } from '@/lib/api'
 import {
@@ -540,6 +541,25 @@ export default function BookDetail() {
                   {book.traceId}
                 </span>
               </div>
+              {book.tags && book.tags.length > 0 && (
+                <div className="pt-2 border-t border-coffee-100 mt-2">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Tag className="w-3.5 h-3.5 text-coffee-500" />
+                    <span className="text-sm text-coffee-500">标签</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {book.tags.map((tag) => (
+                      <Link
+                        key={tag}
+                        to={`/books?tag=${encodeURIComponent(tag)}`}
+                        className="text-xs px-2.5 py-1 rounded-full bg-gradient-to-r from-coffee-50 to-brass-400/10 text-coffee-700 border border-coffee-200 hover:border-coffee-400 hover:shadow-sm transition-all"
+                      >
+                        {tag}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
