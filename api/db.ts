@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat, Bookshelf, BookshelfBook, BookshelfLike, BookshelfVisibility, CreateBookshelfRequest, UpdateBookshelfRequest, BookshelfWithBooks, BookshelfWithOwner } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat, Bookshelf, BookshelfBook, BookshelfLike, BookshelfVisibility, CreateBookshelfRequest, UpdateBookshelfRequest, BookshelfWithBooks, BookshelfWithOwner, RatingStats } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -2499,4 +2499,30 @@ export function getRecommendedBooks(nickname: string, limit: number = 6): { book
     books: scored,
     reason: `根据您偏好的「${topTags.join('」「')}」标签推荐`,
   }
+}
+
+export function getRatingStats(bookId: number): RatingStats {
+  const bookReviews = db.reviews.filter(r => r.bookId === bookId)
+  const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+  let totalRating = 0
+
+  for (const review of bookReviews) {
+    const r = Math.max(1, Math.min(5, Math.round(review.rating)))
+    distribution[r]++
+    totalRating += review.rating
+  }
+
+  const totalCount = bookReviews.length
+  const average = totalCount > 0 ? Math.round((totalRating / totalCount) * 10) / 10 : 0
+
+  return { distribution, average, totalCount }
+}
+
+export function enrichBookWithRating(book: Book): Book & { averageRating: number; reviewCount: number } {
+  const bookReviews = db.reviews.filter(r => r.bookId === book.id)
+  const reviewCount = bookReviews.length
+  const averageRating = reviewCount > 0
+    ? Math.round((bookReviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount) * 10) / 10
+    : 0
+  return { ...book, averageRating, reviewCount }
 }

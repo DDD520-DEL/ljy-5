@@ -48,6 +48,7 @@ import type {
   CreateBookshelfRequest,
   UpdateBookshelfRequest,
   ReaderLevel,
+  RatingStats,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -82,6 +83,7 @@ export const bookApi = {
   get: (id: number) => request<Book>(`/books/${id}`),
   trace: (id: number) => request<TraceLog[]>(`/books/${id}/trace`),
   reviews: (id: number) => request<Review[]>(`/books/${id}/reviews`),
+  ratingStats: (id: number) => request<RatingStats>(`/books/${id}/rating-stats`),
   create: (data: CreateBookRequest) =>
     request<{ book: Book; pointsResult?: { account: PointsAccount; log: PointsLog; levelUp: boolean } }>('/books', { method: 'POST', body: JSON.stringify(data) }),
   addReview: (id: number, data: CreateReviewRequest) =>

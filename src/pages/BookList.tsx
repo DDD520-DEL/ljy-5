@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Search, Filter, Plus, Book, Grid3X3, List, Eye, MessageSquare, Tag, X, BookmarkPlus } from 'lucide-react'
+import { Search, Filter, Plus, Book, Grid3X3, List, Eye, MessageSquare, Tag, X, BookmarkPlus, Star } from 'lucide-react'
 import { bookApi } from '@/lib/api'
 import { sourceTypeLabel, sourceTypeColor, cn } from '@/lib/utils'
 import type { Book as BookType, SourceType, TagStat } from '../../shared/types'
@@ -332,6 +332,15 @@ function BookCardGrid({ book, onAddBookshelf }: { book: BookType; onAddBookshelf
           {book.title}
         </h3>
         <p className="text-sm text-coffee-500 mt-0.5 truncate">{book.author}</p>
+        {book.averageRating != null && book.averageRating > 0 && (
+          <div className="flex items-center gap-1 mt-1">
+            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+            <span className="text-xs font-medium text-coffee-700">{book.averageRating.toFixed(1)}</span>
+            {book.reviewCount != null && (
+              <span className="text-xs text-coffee-400">({book.reviewCount})</span>
+            )}
+          </div>
+        )}
         {book.tags && book.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {book.tags.slice(0, 3).map((tag) => (
@@ -405,6 +414,15 @@ function BookCardList({ book, onAddBookshelf }: { book: BookType; onAddBookshelf
               {book.title}
             </h3>
             <p className="text-sm text-coffee-500 mt-0.5">{book.author}</p>
+            {book.averageRating != null && book.averageRating > 0 && (
+              <div className="flex items-center gap-1 mt-1">
+                <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                <span className="text-xs font-medium text-coffee-700">{book.averageRating.toFixed(1)}</span>
+                {book.reviewCount != null && (
+                  <span className="text-xs text-coffee-400">({book.reviewCount})</span>
+                )}
+              </div>
+            )}
           </Link>
           <span className={cn('badge border flex-shrink-0', sourceTypeColor[book.sourceType])}>
             {sourceTypeLabel[book.sourceType]}

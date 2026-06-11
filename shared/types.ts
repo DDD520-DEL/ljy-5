@@ -40,6 +40,14 @@ export interface Book {
   createdAt: string
   borrowCount: number
   discussCount: number
+  averageRating?: number
+  reviewCount?: number
+}
+
+export interface RatingStats {
+  distribution: Record<number, number>
+  average: number
+  totalCount: number
 }
 
 export interface TraceLog {

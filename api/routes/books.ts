@@ -1,7 +1,7 @@
 import express from 'express'
 import QRCode from 'qrcode'
-import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower, getReviewsWithLevel, addPoints, getPointsRanking, getBorrowRanking, getReaderProfile, createBorrowRecord, getBookBorrowStatusDetail, sendReminder, getAllActiveBorrowRecords, getAllOverdueRecords, getNotifications, markNotificationRead, markAllNotificationsRead, getTagStats, getRecommendedBooks } from '../db'
-import type { CreateBookRequest, CreateReviewRequest, ReaderRanking, TagStat, RecommendResult } from '../../shared/types'
+import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower, getReviewsWithLevel, addPoints, getPointsRanking, getBorrowRanking, getReaderProfile, createBorrowRecord, getBookBorrowStatusDetail, sendReminder, getAllActiveBorrowRecords, getAllOverdueRecords, getNotifications, markNotificationRead, markAllNotificationsRead, getTagStats, getRecommendedBooks, getRatingStats, enrichBookWithRating } from '../db'
+import type { CreateBookRequest, CreateReviewRequest, ReaderRanking, TagStat, RecommendResult, RatingStats } from '../../shared/types'
 
 const router = express.Router()
 
@@ -37,7 +37,7 @@ router.get('/', (req, res) => {
     })
   }
   
-  res.json(books)
+  res.json(books.map(b => enrichBookWithRating(b)))
 })
 
 router.get('/ranking', (req, res) => {
@@ -120,6 +120,18 @@ router.get('/borrow/overdue', (req, res) => {
   res.json(records)
 })
 
+router.get('/:id/rating-stats', (req, res) => {
+  const id = parseInt(req.params.id)
+  const db = getDB()
+  const book = db.books.find(b => b.id === id)
+  if (!book) {
+    res.status(404).json({ error: '图书不存在' })
+    return
+  }
+  const stats: RatingStats = getRatingStats(id)
+  res.json(stats)
+})
+
 router.get('/:id', (req, res) => {
   const db = getDB()
   const id = parseInt(req.params.id)
@@ -128,7 +140,7 @@ router.get('/:id', (req, res) => {
     res.status(404).json({ error: '图书不存在' })
     return
   }
-  res.json(book)
+  res.json(enrichBookWithRating(book))
 })
 
 router.get('/:id/trace', (req, res) => {

@@ -35,6 +35,7 @@ import {
 } from 'lucide-react'
 import { bookApi, reservationApi, noteApi } from '@/lib/api'
 import { BookshelfSelector } from '@/components/BookshelfSelector'
+import { RatingDistribution } from '@/components/RatingDistribution'
 import { useReaderStore } from '@/hooks/useReaderStore'
 import {
   formatDateTime,
@@ -51,7 +52,7 @@ import {
   calculateDaysRemaining,
   cn,
 } from '@/lib/utils'
-import type { Book as BookType, TraceLog, Review, Reservation, ReviewWithLevel, Note, NoteComment, NoteVisibility, BookBorrowStatus } from '../../shared/types'
+import type { Book as BookType, TraceLog, Review, Reservation, ReviewWithLevel, Note, NoteComment, NoteVisibility, BookBorrowStatus, RatingStats } from '../../shared/types'
 
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>()
@@ -114,6 +115,8 @@ export default function BookDetail() {
   const [likingNotes, setLikingNotes] = useState<Record<number, boolean>>({})
   const [likeNickname, setLikeNickname] = useState('')
 
+  const [ratingStats, setRatingStats] = useState<RatingStats | null>(null)
+
   async function refreshLikedNotes(noteList: Note[], nickname: string) {
     if (!nickname.trim() || noteList.length === 0) {
       setLikedNotes({})
@@ -139,7 +142,7 @@ export default function BookDetail() {
       setError(null)
       const bookId = Number(id)
 
-      const [bookData, traceData, reviewsData, qrcodeDataResult, statusData, reservationsData, notesData] = await Promise.all([
+      const [bookData, traceData, reviewsData, qrcodeDataResult, statusData, reservationsData, notesData, statsData] = await Promise.all([
         bookApi.get(bookId),
         bookApi.trace(bookId),
         bookApi.reviews(bookId),
@@ -147,6 +150,7 @@ export default function BookDetail() {
         bookApi.status(bookId),
         reservationApi.listByBook(bookId),
         noteApi.listByBook(bookId),
+        bookApi.ratingStats(bookId),
       ])
 
       setBook(bookData)
@@ -157,6 +161,7 @@ export default function BookDetail() {
       setBorrowStatus(statusData.borrowStatus || null)
       setReservations(reservationsData)
       setNotes(notesData)
+      setRatingStats(statsData)
 
       if (likeNickname.trim()) {
         refreshLikedNotes(notesData, likeNickname)
@@ -201,8 +206,10 @@ export default function BookDetail() {
         bookApi.get(book.id),
         bookApi.reviews(book.id),
       ])
+      const statsData = await bookApi.ratingStats(book.id)
       setBook(bookData)
       setReviews(reviewsData)
+      setRatingStats(statsData)
     } catch (err) {
       alert(err instanceof Error ? err.message : '提交失败')
     } finally {
@@ -589,6 +596,16 @@ export default function BookDetail() {
               </div>
             </div>
           </div>
+
+          {ratingStats && ratingStats.totalCount > 0 && (
+            <div className="card p-6">
+              <h3 className="section-title flex items-center gap-2 mb-4">
+                <Star className="w-4 h-4" />
+                评分分布
+              </h3>
+              <RatingDistribution stats={ratingStats} />
+            </div>
+          )}
 
           <div className="card p-6">
             <h3 className="section-title flex items-center gap-2 mb-4">
