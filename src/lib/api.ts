@@ -59,6 +59,31 @@ import type {
 
 const API_BASE = '/api'
 
+async function downloadFile(url: string): Promise<void> {
+  const res = await fetch(`${API_BASE}${url}`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: '导出失败' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  const blob = await res.blob()
+  const disposition = res.headers.get('Content-Disposition')
+  let fileName = 'export.xlsx'
+  if (disposition) {
+    const match = disposition.match(/filename\*?=(?:UTF-8'')?([^;\n]+)/i)
+    if (match) {
+      fileName = decodeURIComponent(match[1].replace(/^"|"$/g, ''))
+    }
+  }
+  const blobUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(blobUrl)
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${url}`, {
     ...options,
@@ -159,10 +184,10 @@ export const bookApi = {
     if (params?.category) qs.set('category', params.category)
     if (params?.source) qs.set('source', params.source)
     const query = qs.toString()
-    window.open(`${API_BASE}/books/export${query ? `?${query}` : ''}`, '_blank')
+    return downloadFile(`/books/export${query ? `?${query}` : ''}`)
   },
   exportTrace: (bookId: number) => {
-    window.open(`${API_BASE}/books/${bookId}/trace/export`, '_blank')
+    return downloadFile(`/books/${bookId}/trace/export`)
   },
 }
 

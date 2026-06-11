@@ -97,6 +97,10 @@ export default function BookDetail() {
   const [sendingReminder, setSendingReminder] = useState(false)
   const [reminderSuccess, setReminderSuccess] = useState(false)
 
+  const [exportingTrace, setExportingTrace] = useState(false)
+  const [exportTraceError, setExportTraceError] = useState('')
+  const [exportTraceSuccess, setExportTraceSuccess] = useState(false)
+
   const [detailTab, setDetailTab] = useState<'trace' | 'notes'>('trace')
   const [notes, setNotes] = useState<Note[]>([])
   const [showNoteEditor, setShowNoteEditor] = useState(false)
@@ -305,6 +309,22 @@ export default function BookDetail() {
       alert(err instanceof Error ? err.message : '催还失败')
     } finally {
       setSendingReminder(false)
+    }
+  }
+
+  async function handleExportTrace() {
+    if (!book) return
+    try {
+      setExportingTrace(true)
+      setExportTraceError('')
+      setExportTraceSuccess(false)
+      await bookApi.exportTrace(book.id)
+      setExportTraceSuccess(true)
+      setTimeout(() => setExportTraceSuccess(false), 3000)
+    } catch (err) {
+      setExportTraceError(err instanceof Error ? err.message : '导出失败，请稍后重试')
+    } finally {
+      setExportingTrace(false)
     }
   }
 
@@ -1029,13 +1049,39 @@ export default function BookDetail() {
                 </button>
               </div>
               {detailTab === 'trace' && traceLogs.length > 0 && (
-                <button
-                  onClick={() => book && bookApi.exportTrace(book.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-coffee-50 text-coffee-700 hover:bg-coffee-100 transition-colors flex-shrink-0"
-                >
-                  <Download className="w-4 h-4" />
-                  导出日志
-                </button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {exportTraceError && (
+                    <span className="text-xs text-red-500">{exportTraceError}</span>
+                  )}
+                  {exportTraceSuccess && (
+                    <span className="text-xs text-emerald-600 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      导出成功
+                    </span>
+                  )}
+                  <button
+                    onClick={handleExportTrace}
+                    disabled={exportingTrace}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                      exportingTrace
+                        ? 'bg-coffee-100 text-coffee-400 cursor-not-allowed'
+                        : 'bg-coffee-50 text-coffee-700 hover:bg-coffee-100'
+                    )}
+                  >
+                    {exportingTrace ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-coffee-300 border-t-coffee-600 rounded-full animate-spin" />
+                        导出中
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        导出日志
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
 

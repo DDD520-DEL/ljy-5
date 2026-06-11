@@ -26,6 +26,8 @@ export default function Dashboard() {
   const [exportCategory, setExportCategory] = useState<string>('all')
   const [exportSource, setExportSource] = useState<string>('all')
   const [exporting, setExporting] = useState(false)
+  const [exportSuccess, setExportSuccess] = useState(false)
+  const [exportError, setExportError] = useState('')
 
   useEffect(() => {
     loadData()
@@ -188,19 +190,27 @@ export default function Dashboard() {
     { value: 'secondhand', label: '二手回收' },
   ]
 
+  function handleCloseExportModal() {
+    setShowExportModal(false)
+    setExportCategory('all')
+    setExportSource('all')
+    setExportError('')
+    setExportSuccess(false)
+  }
+
   async function handleExport() {
     try {
       setExporting(true)
+      setExportError('')
+      setExportSuccess(false)
       const params: { category?: string; source?: string } = {}
       if (exportCategory !== 'all') params.category = exportCategory
       if (exportSource !== 'all') params.source = exportSource
-      bookApi.exportBooks(params)
-      setTimeout(() => {
-        setShowExportModal(false)
-        setExporting(false)
-      }, 500)
+      await bookApi.exportBooks(params)
+      setExportSuccess(true)
     } catch (err) {
-      alert(err instanceof Error ? err.message : '导出失败')
+      setExportError(err instanceof Error ? err.message : '导出失败，请稍后重试')
+    } finally {
       setExporting(false)
     }
   }
@@ -880,7 +890,7 @@ export default function Dashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => !exporting && setShowExportModal(false)}
+            onClick={() => { if (!exporting) handleCloseExportModal() }}
           />
           <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b border-coffee-100">
@@ -894,7 +904,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <button
-                onClick={() => !exporting && setShowExportModal(false)}
+                onClick={() => { if (!exporting) handleCloseExportModal() }}
                 disabled={exporting}
                 className="p-2 rounded-lg hover:bg-coffee-50 transition-colors text-coffee-400 hover:text-coffee-600 disabled:opacity-50"
               >
@@ -902,120 +912,148 @@ export default function Dashboard() {
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-coffee-800 mb-2.5">
-                  导出范围
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setExportCategory('all')}
-                    className={cn(
-                      'flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 font-medium',
-                      exportCategory === 'all'
-                        ? 'border-coffee-500 bg-coffee-50 text-coffee-800'
-                        : 'border-coffee-100 hover:border-coffee-200 text-coffee-500 hover:text-coffee-600'
-                    )}
-                  >
-                    <Book className="w-4 h-4" />
-                    全部图书
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (categories.length > 1) {
-                        setExportCategory(categories[1])
-                      }
-                    }}
-                    className={cn(
-                      'flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 font-medium',
-                      exportCategory !== 'all'
-                        ? 'border-coffee-500 bg-coffee-50 text-coffee-800'
-                        : 'border-coffee-100 hover:border-coffee-200 text-coffee-500 hover:text-coffee-600'
-                    )}
-                  >
-                    <Tag className="w-4 h-4" />
-                    按分类筛选
-                  </button>
+            {exportSuccess ? (
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="w-8 h-8 text-emerald-600" />
                 </div>
+                <h3 className="text-xl font-serif font-bold text-coffee-900 mb-2">导出成功！</h3>
+                <p className="text-coffee-600 mb-6">
+                  Excel 文件已开始下载，请查看浏览器下载记录。
+                </p>
+                <button
+                  onClick={handleCloseExportModal}
+                  className="px-6 py-2.5 bg-coffee-700 text-white rounded-xl font-medium hover:bg-coffee-800 transition-colors"
+                >
+                  完成
+                </button>
               </div>
+            ) : (
+              <div className="p-6 space-y-5">
+                {exportError && (
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-red-700">导出失败</p>
+                      <p className="text-xs text-red-600 mt-0.5">{exportError}</p>
+                    </div>
+                  </div>
+                )}
 
-              {exportCategory !== 'all' && (
                 <div>
                   <label className="block text-sm font-medium text-coffee-800 mb-2.5">
-                    选择分类
+                    导出范围
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setExportCategory('all')}
+                      className={cn(
+                        'flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 font-medium',
+                        exportCategory === 'all'
+                          ? 'border-coffee-500 bg-coffee-50 text-coffee-800'
+                          : 'border-coffee-100 hover:border-coffee-200 text-coffee-500 hover:text-coffee-600'
+                      )}
+                    >
+                      <Book className="w-4 h-4" />
+                      全部图书
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (categories.length > 1) {
+                          setExportCategory(categories[1])
+                        }
+                      }}
+                      className={cn(
+                        'flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 font-medium',
+                        exportCategory !== 'all'
+                          ? 'border-coffee-500 bg-coffee-50 text-coffee-800'
+                          : 'border-coffee-100 hover:border-coffee-200 text-coffee-500 hover:text-coffee-600'
+                      )}
+                    >
+                      <Tag className="w-4 h-4" />
+                      按分类筛选
+                    </button>
+                  </div>
+                </div>
+
+                {exportCategory !== 'all' && (
+                  <div>
+                    <label className="block text-sm font-medium text-coffee-800 mb-2.5">
+                      选择分类
+                    </label>
+                    <select
+                      value={exportCategory}
+                      onChange={(e) => setExportCategory(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-coffee-100 bg-white transition-all duration-200 focus:outline-none focus:border-coffee-500 focus:ring-4 focus:ring-coffee-500/10 text-coffee-800"
+                    >
+                      {categories.filter(c => c !== 'all').map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-coffee-800 mb-2.5">
+                    来源类型 <span className="text-coffee-400 font-normal">（可选）</span>
                   </label>
                   <select
-                    value={exportCategory}
-                    onChange={(e) => setExportCategory(e.target.value)}
+                    value={exportSource}
+                    onChange={(e) => setExportSource(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl border-2 border-coffee-100 bg-white transition-all duration-200 focus:outline-none focus:border-coffee-500 focus:ring-4 focus:ring-coffee-500/10 text-coffee-800"
                   >
-                    {categories.filter(c => c !== 'all').map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
+                    {sourceOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
-              )}
 
-              <div>
-                <label className="block text-sm font-medium text-coffee-800 mb-2.5">
-                  来源类型 <span className="text-coffee-400 font-normal">（可选）</span>
-                </label>
-                <select
-                  value={exportSource}
-                  onChange={(e) => setExportSource(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-coffee-100 bg-white transition-all duration-200 focus:outline-none focus:border-coffee-500 focus:ring-4 focus:ring-coffee-500/10 text-coffee-800"
-                >
-                  {sourceOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
+                <div className="bg-coffee-50 rounded-xl p-4 border border-coffee-100">
+                  <p className="text-sm font-medium text-coffee-800 mb-2">导出字段说明</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-coffee-600">
+                    <span>• 书名</span>
+                    <span>• 作者</span>
+                    <span>• ISBN</span>
+                    <span>• 分类</span>
+                    <span>• 来源类型</span>
+                    <span>• 入库时间</span>
+                    <span>• 借阅次数</span>
+                    <span>• 评论数</span>
+                  </div>
+                </div>
 
-              <div className="bg-coffee-50 rounded-xl p-4 border border-coffee-100">
-                <p className="text-sm font-medium text-coffee-800 mb-2">导出字段说明</p>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-coffee-600">
-                  <span>• 书名</span>
-                  <span>• 作者</span>
-                  <span>• ISBN</span>
-                  <span>• 分类</span>
-                  <span>• 来源类型</span>
-                  <span>• 入库时间</span>
-                  <span>• 借阅次数</span>
-                  <span>• 评论数</span>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseExportModal}
+                    disabled={exporting}
+                    className="flex-1 px-4 py-3 rounded-xl border-2 border-coffee-200 text-coffee-600 font-medium hover:bg-coffee-50 transition-colors disabled:opacity-50"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExport}
+                    disabled={exporting}
+                    className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-coffee-600 to-coffee-800 text-white font-medium hover:from-coffee-700 hover:to-coffee-900 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-coffee-500/20"
+                  >
+                    {exporting ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        导出中...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        导出 Excel
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowExportModal(false)}
-                  disabled={exporting}
-                  className="flex-1 px-4 py-3 rounded-xl border-2 border-coffee-200 text-coffee-600 font-medium hover:bg-coffee-50 transition-colors disabled:opacity-50"
-                >
-                  取消
-                </button>
-                <button
-                  type="button"
-                  onClick={handleExport}
-                  disabled={exporting}
-                  className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-coffee-600 to-coffee-800 text-white font-medium hover:from-coffee-700 hover:to-coffee-900 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-coffee-500/20"
-                >
-                  {exporting ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      导出中...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4" />
-                      导出 Excel
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
