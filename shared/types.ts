@@ -460,3 +460,48 @@ export interface ExchangeListingWithRequests extends ExchangeListing {
   requests: ExchangeRequest[]
   requestCount: number
 }
+
+export interface MeetupDiscussionPost {
+  id: number
+  meetupId: number
+  bookId?: number
+  nickname: string
+  title: string
+  content: string
+  images: string[]
+  replyCount: number
+  lastReplyAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface MeetupDiscussionReply {
+  id: number
+  postId: number
+  meetupId: number
+  nickname: string
+  content: string
+  images: string[]
+  parentId?: number
+  replyToNickname?: string
+  createdAt: string
+}
+
+export interface MeetupDiscussionPostWithReplies extends MeetupDiscussionPost {
+  replies: MeetupDiscussionReply[]
+}
+
+export interface CreateMeetupDiscussionPostRequest {
+  nickname: string
+  title: string
+  content: string
+  images?: string[]
+}
+
+export interface CreateMeetupDiscussionReplyRequest {
+  nickname: string
+  content: string
+  images?: string[]
+  parentId?: number
+  replyToNickname?: string
+}

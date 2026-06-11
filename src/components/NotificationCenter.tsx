@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useMemo } from 'react'
 import { Bell, CheckCheck, Clock, BookOpen, Users, MessageSquare, Heart, Gift, AlertCircle, X } from 'lucide-react'
-import { useNotificationStore, selectUnreadCount, selectSortedNotifications } from '@/hooks/useNotificationStore'
+import { useNotificationStore, selectUnreadCount } from '@/hooks/useNotificationStore'
 import { cn, formatDateTime } from '@/lib/utils'
 import type { Notification, NotificationType } from '../../shared/types'
 
@@ -46,7 +46,12 @@ export default function NotificationCenter({ nickname, variant = 'default' }: No
     fetchNotifications,
   } = useNotificationStore()
   const unreadCount = useNotificationStore(selectUnreadCount)
-  const notifications = useNotificationStore(selectSortedNotifications)
+  const notificationsRaw = useNotificationStore((state) => state.notifications)
+  const notifications = useMemo(() => {
+    return [...notificationsRaw].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+  }, [notificationsRaw])
 
   useEffect(() => {
     if (nickname) {

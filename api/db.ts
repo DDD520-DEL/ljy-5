@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -379,6 +379,8 @@ export interface Database {
   notifications: Notification[]
   exchangeListings: ExchangeListing[]
   exchangeRequests: ExchangeRequest[]
+  meetupDiscussionPosts: MeetupDiscussionPost[]
+  meetupDiscussionReplies: MeetupDiscussionReply[]
   nextBookId: number
   nextTraceLogId: number
   nextReviewId: number
@@ -396,6 +398,8 @@ export interface Database {
   nextNotificationId: number
   nextExchangeListingId: number
   nextExchangeRequestId: number
+  nextMeetupDiscussionPostId: number
+  nextMeetupDiscussionReplyId: number
 }
 
 const initialCheckIns: CheckIn[] = [
@@ -456,6 +460,60 @@ const initialNotifications: Notification[] = [
   { id: 1, nickname: '夜读者', type: 'reminder', title: '图书借阅到期提醒', content: '您借阅的《百年孤独》已于 2026年5月27日到期，请尽快归还。', relatedBookId: 1, relatedBookTitle: '百年孤独', read: false, createdAt: daysAgo(10), emailSent: true, emailSentAt: daysAgo(10) },
 ]
 
+const initialMeetupDiscussionPosts: MeetupDiscussionPost[] = [
+  {
+    id: 1,
+    meetupId: 1,
+    bookId: 1,
+    nickname: '爱读书的猫',
+    title: '大家觉得布恩迪亚家族的宿命感来自哪里？',
+    content: '读完《百年孤独》一直在想，这个家族的悲剧是性格决定的，还是时代的必然？马尔克斯用了很多轮回的写法，像是在暗示某种宿命论。想听听大家的看法～',
+    images: [],
+    replyCount: 3,
+    lastReplyAt: daysAgo(2),
+    createdAt: daysAgo(5),
+    updatedAt: daysAgo(5),
+  },
+  {
+    id: 2,
+    meetupId: 1,
+    bookId: 1,
+    nickname: '夜读者',
+    title: '最喜欢书中的哪个女性角色？',
+    content: '我最喜欢乌尔苏拉，她是整个家族的支柱，活了那么久，见证了一切。阿玛兰妲也很复杂，让人又爱又恨。丽贝卡的结局太让人唏嘘了。大家呢？',
+    images: [],
+    replyCount: 2,
+    lastReplyAt: daysAgo(3),
+    createdAt: daysAgo(6),
+    updatedAt: daysAgo(6),
+  },
+  {
+    id: 3,
+    meetupId: 2,
+    bookId: 2,
+    nickname: '小王子的玫瑰',
+    title: '关于"驯服"的理解',
+    content: '狐狸说的"驯服"到底是什么意思？建立联系？承担责任？还是两者都有？感觉这个概念贯穿了整本书，也是小王子成长的核心。',
+    images: [],
+    replyCount: 4,
+    lastReplyAt: daysAgo(20),
+    createdAt: daysAgo(25),
+    updatedAt: daysAgo(25),
+  },
+]
+
+const initialMeetupDiscussionReplies: MeetupDiscussionReply[] = [
+  { id: 1, postId: 1, meetupId: 1, nickname: '夜读者', content: '我觉得两者都有吧。性格决定了他们的选择，而时代背景放大了这些选择的后果。马尔克斯写的不仅是一个家族，更是整个拉美的缩影。', images: [], createdAt: daysAgo(4) },
+  { id: 2, postId: 1, meetupId: 1, nickname: '书虫阿明', content: '同意楼上。布恩迪亚家族的人都有种偏执的性格，比如奥雷里亚诺上校的反复战争，阿玛兰妲的自我折磨。他们都在重复同样的错误，这就是宿命感的来源吧。', images: [], createdAt: daysAgo(3), parentId: 1, replyToNickname: '夜读者' },
+  { id: 3, postId: 1, meetupId: 1, nickname: '文字的力量', content: '很期待读书会现场讨论这个话题！我觉得孤独本身就是主题，每个人都活在自己的孤独里，即使在同一个家族中也是如此。', images: [], createdAt: daysAgo(2) },
+  { id: 4, postId: 2, meetupId: 1, nickname: '爱读书的猫', content: '乌尔苏拉真的是全书最有力量的角色！她用女性的韧性撑住了整个家族。没有她，这个家族早就散了。', images: [], createdAt: daysAgo(5) },
+  { id: 5, postId: 2, meetupId: 1, nickname: '不想长大', content: '我喜欢蕾梅黛丝，虽然她出场不多，但那种不食人间烟火的感觉，像是魔幻现实主义的化身。', images: [], createdAt: daysAgo(3) },
+  { id: 6, postId: 3, meetupId: 2, nickname: '夜读者', content: '"驯服"就是建立独一无二的联系吧。在那之前，你只是千千万万个小男孩中的一个，我只是千千万万个狐狸中的一个。驯服之后，我们对彼此来说都是唯一的。', images: [], createdAt: daysAgo(24) },
+  { id: 7, postId: 3, meetupId: 2, nickname: '书虫阿明', content: '说得好！而且驯服还意味着责任——你对你驯服过的一切都要负责到底。所以小王子最后还是要回到他的玫瑰身边。', images: [], createdAt: daysAgo(23), parentId: 6, replyToNickname: '夜读者' },
+  { id: 8, postId: 3, meetupId: 2, nickname: '文字的力量', content: '每次读到狐狸那段都会哭。"真正重要的东西，用眼睛是看不见的。" 这句话太戳人了。', images: [], createdAt: daysAgo(22) },
+  { id: 9, postId: 3, meetupId: 2, nickname: '追风筝的人', content: '期待下次读书会继续讨论～', images: [], createdAt: daysAgo(20) },
+]
+
 const initialDB: Database = {
   books: initialBooks,
   traceLogs: initialTraceLogs,
@@ -476,6 +534,8 @@ const initialDB: Database = {
   notifications: initialNotifications,
   exchangeListings: initialExchangeListings,
   exchangeRequests: initialExchangeRequests,
+  meetupDiscussionPosts: initialMeetupDiscussionPosts,
+  meetupDiscussionReplies: initialMeetupDiscussionReplies,
   nextBookId: 6,
   nextTraceLogId: 9,
   nextReviewId: 9,
@@ -493,6 +553,8 @@ const initialDB: Database = {
   nextNotificationId: 2,
   nextExchangeListingId: 4,
   nextExchangeRequestId: 3,
+  nextMeetupDiscussionPostId: 4,
+  nextMeetupDiscussionReplyId: 10,
 }
 
 let db: Database = initialDB
@@ -560,9 +622,18 @@ function loadDB(): Database {
         }
       }
       
+      if (!parsed.meetupDiscussionPosts) {
+        parsed.meetupDiscussionPosts = initialMeetupDiscussionPosts
+        parsed.meetupDiscussionReplies = initialMeetupDiscussionReplies
+        parsed.nextMeetupDiscussionPostId = 4
+        parsed.nextMeetupDiscussionReplyId = 10
+        saveDB(parsed as Database)
+        console.log('[DB Migration] 初始化读书会讨论帖数据')
+      }
+      
       console.log(`[DB] 已从 ${DATA_FILE} 加载数据`)
       console.log(`[DB] 图书: ${parsed.books?.length || 0} 本 | 读书会: ${parsed.meetups?.length || 0} 个 | 短评: ${parsed.reviews?.length || 0} 条 | 笔记: ${parsed.notes?.length || 0} 条`)
-      console.log(`[DB] 借阅记录: ${parsed.borrowRecords?.length || 0} 条 | 通知: ${parsed.notifications?.length || 0} 条`)
+      console.log(`[DB] 借阅记录: ${parsed.borrowRecords?.length || 0} 条 | 通知: ${parsed.notifications?.length || 0} 条 | 讨论帖: ${parsed.meetupDiscussionPosts?.length || 0} 条`)
       return parsed as Database
     } catch (err) {
       console.error('[DB] 数据文件读取失败，使用初始数据:', err)
@@ -1861,4 +1932,159 @@ export function getExchangeListingsByOwner(owner: string): ExchangeListing[] {
   return db.exchangeListings
     .filter(l => l.owner === owner)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+export function getMeetupDiscussionPosts(meetupId: number): MeetupDiscussionPost[] {
+  return db.meetupDiscussionPosts
+    .filter(p => p.meetupId === meetupId)
+    .sort((a, b) => new Date(b.lastReplyAt).getTime() - new Date(a.lastReplyAt).getTime())
+}
+
+export function getMeetupDiscussionPostById(id: number): MeetupDiscussionPost | null {
+  return db.meetupDiscussionPosts.find(p => p.id === id) || null
+}
+
+export function getMeetupDiscussionReplies(postId: number): MeetupDiscussionReply[] {
+  return db.meetupDiscussionReplies
+    .filter(r => r.postId === postId)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+}
+
+export function addMeetupDiscussionPost(
+  meetupId: number, data: { nickname: string; title: string; content: string; images?: string[] }
+): { post: MeetupDiscussionPost; pointsResult?: ReturnType<typeof addPoints> } | null {
+  const meetup = db.meetups.find(m => m.id === meetupId)
+  if (!meetup) return null
+
+  const now = new Date().toISOString()
+  const post: MeetupDiscussionPost = {
+    id: db.nextMeetupDiscussionPostId++,
+    meetupId,
+    bookId: meetup.bookId,
+    nickname: data.nickname,
+    title: data.title,
+    content: data.content,
+    images: data.images || [],
+    replyCount: 0,
+    lastReplyAt: now,
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  db.meetupDiscussionPosts.push(post)
+
+  if (meetup.bookId) {
+    const book = db.books.find(b => b.id === meetup.bookId)
+    if (book) {
+      book.discussCount++
+    }
+  }
+
+  let pointsResult
+  if (data.nickname) {
+    pointsResult = addPoints(
+      data.nickname,
+      'review',
+      `在《${meetup.title}》读书会发表讨论帖`,
+      post.id
+    )
+  }
+
+  persistDB()
+  console.log(`[MeetupDiscussion] 新讨论帖: ${post.title} (读书会: ${meetupId}, 作者: ${data.nickname})`)
+  return { post, pointsResult }
+}
+
+export function addMeetupDiscussionReply(
+  postId: number,
+  data: { nickname: string; content: string; images?: string[]; parentId?: number; replyToNickname?: string }
+): { reply: MeetupDiscussionReply; post: MeetupDiscussionPost } | null {
+  const post = db.meetupDiscussionPosts.find(p => p.id === postId)
+  if (!post) return null
+
+  const now = new Date().toISOString()
+  const reply: MeetupDiscussionReply = {
+    id: db.nextMeetupDiscussionReplyId++,
+    postId,
+    meetupId: post.meetupId,
+    nickname: data.nickname,
+    content: data.content,
+    images: data.images || [],
+    parentId: data.parentId,
+    replyToNickname: data.replyToNickname,
+    createdAt: now,
+  }
+
+  db.meetupDiscussionReplies.push(reply)
+  post.replyCount++
+  post.lastReplyAt = now
+
+  if (post.nickname !== data.nickname) {
+    createNotification(
+      post.nickname,
+      'comment_reply',
+      '你的讨论帖有新回复',
+      `读者「${data.nickname}」回复了你的讨论帖《${post.title}》：「${data.content.slice(0, 30)}${data.content.length > 30 ? '...' : ''}」。`,
+      post.bookId,
+      undefined,
+      postId,
+      'meetup_post'
+    )
+  }
+
+  if (data.replyToNickname && data.replyToNickname !== data.nickname && data.replyToNickname !== post.nickname) {
+    createNotification(
+      data.replyToNickname,
+      'comment_reply',
+      '你有新回复',
+      `读者「${data.nickname}」回复了你：「${data.content.slice(0, 30)}${data.content.length > 30 ? '...' : ''}」。`,
+      post.bookId,
+      undefined,
+      postId,
+      'meetup_post'
+    )
+  }
+
+  persistDB()
+  console.log(`[MeetupDiscussion] 新回复: 帖子ID ${postId} (回复者: ${data.nickname})`)
+  return { reply, post }
+}
+
+export function getHotMeetupDiscussionPosts(limit: number = 10, days?: number): MeetupDiscussionPost[] {
+  let posts = [...db.meetupDiscussionPosts]
+
+  if (days) {
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - days)
+    posts = posts.filter(p => new Date(p.lastReplyAt) >= cutoff)
+  }
+
+  return posts
+    .sort((a, b) => {
+      const hotA = a.replyCount * 3 + new Date(a.lastReplyAt).getTime() / 86400000
+      const hotB = b.replyCount * 3 + new Date(b.lastReplyAt).getTime() / 86400000
+      return hotB - hotA
+    })
+    .slice(0, limit)
+}
+
+export function deleteMeetupDiscussionPost(id: number): boolean {
+  const index = db.meetupDiscussionPosts.findIndex(p => p.id === id)
+  if (index === -1) return false
+
+  const post = db.meetupDiscussionPosts[index]
+  
+  if (post.bookId) {
+    const book = db.books.find(b => b.id === post.bookId)
+    if (book) {
+      book.discussCount = Math.max(0, book.discussCount - 1)
+    }
+  }
+
+  db.meetupDiscussionPosts.splice(index, 1)
+  db.meetupDiscussionReplies = db.meetupDiscussionReplies.filter(r => r.postId !== id)
+
+  persistDB()
+  console.log(`[MeetupDiscussion] 删除讨论帖: ID ${id}`)
+  return true
 }

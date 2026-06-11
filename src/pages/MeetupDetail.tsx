@@ -4,6 +4,7 @@ import {
   Calendar,
   MapPin,
   Users,
+  User,
   Image,
   FileText,
   UserPlus,
@@ -21,6 +22,11 @@ import {
   ExternalLink,
   RefreshCw,
   Download,
+  MessageSquare,
+  ChevronDown,
+  ChevronUp,
+  Reply,
+  ImagePlus,
 } from 'lucide-react'
 import { meetupApi, bookApi } from '@/lib/api'
 import {
@@ -30,8 +36,9 @@ import {
   readerLevelColor,
   formatDateTime,
   cn,
+  formatDate,
 } from '@/lib/utils'
-import type { Meetup, Registration, Book as BookType, ReaderLevel, CheckIn, MeetupCheckInStats } from '../../shared/types'
+import type { Meetup, Registration, Book as BookType, ReaderLevel, CheckIn, MeetupCheckInStats, MeetupDiscussionPostWithReplies, MeetupDiscussionReply } from '../../shared/types'
 
 export default function MeetupDetail() {
   const { id } = useParams<{ id: string }>()
@@ -62,6 +69,24 @@ export default function MeetupDetail() {
 
   const [refreshing, setRefreshing] = useState(false)
 
+  const [discussionPosts, setDiscussionPosts] = useState<MeetupDiscussionPostWithReplies[]>([])
+  const [discussionLoading, setDiscussionLoading] = useState(false)
+  const [expandedPostId, setExpandedPostId] = useState<number | null>(null)
+
+  const [showPostForm, setShowPostForm] = useState(false)
+  const [newPostNickname, setNewPostNickname] = useState('')
+  const [newPostTitle, setNewPostTitle] = useState('')
+  const [newPostContent, setNewPostContent] = useState('')
+  const [newPostImages, setNewPostImages] = useState('')
+  const [submittingPost, setSubmittingPost] = useState(false)
+
+  const [replyToPostId, setReplyToPostId] = useState<number | null>(null)
+  const [replyToReplyId, setReplyToReplyId] = useState<number | null>(null)
+  const [replyToNickname, setReplyToNickname] = useState('')
+  const [replyContent, setReplyContent] = useState('')
+  const [replyImages, setReplyImages] = useState('')
+  const [submittingReply, setSubmittingReply] = useState(false)
+
   const isAdmin = true
 
   const loadData = useCallback(async () => {
@@ -86,12 +111,26 @@ export default function MeetupDetail() {
           console.error('Failed to load recommended book:', err)
         }
       }
+
+      loadDiscussionPosts()
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
     } finally {
       setLoading(false)
     }
   }, [id])
+
+  async function loadDiscussionPosts() {
+    try {
+      setDiscussionLoading(true)
+      const posts = await meetupApi.getDiscussionPosts(Number(id))
+      setDiscussionPosts(posts)
+    } catch (err) {
+      console.error('Failed to load discussion posts:', err)
+    } finally {
+      setDiscussionLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!id) return
@@ -173,6 +212,86 @@ export default function MeetupDetail() {
     } finally {
       setRefreshing(false)
     }
+  }
+
+  async function handleCreatePost(e: React.FormEvent) {
+    e.preventDefault()
+    if (!meetup || !newPostNickname.trim() || !newPostTitle.trim() || !newPostContent.trim()) return
+
+    try {
+      setSubmittingPost(true)
+      const images = newPostImages
+        .split('\n')
+        .map(url => url.trim())
+        .filter(url => url.length > 0)
+
+      await meetupApi.createDiscussionPost(meetup.id, {
+        nickname: newPostNickname.trim(),
+        title: newPostTitle.trim(),
+        content: newPostContent.trim(),
+        images: images.length > 0 ? images : undefined,
+      })
+
+      setNewPostNickname('')
+      setNewPostTitle('')
+      setNewPostContent('')
+      setNewPostImages('')
+      setShowPostForm(false)
+      await loadDiscussionPosts()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '发帖失败')
+    } finally {
+      setSubmittingPost(false)
+    }
+  }
+
+  function handleStartReply(postId: number, replyId?: number, nickname?: string) {
+    setReplyToPostId(postId)
+    setReplyToReplyId(replyId || null)
+    setReplyToNickname(nickname || '')
+    setReplyContent('')
+    setReplyImages('')
+    setExpandedPostId(postId)
+  }
+
+  function handleCancelReply() {
+    setReplyToPostId(null)
+    setReplyToReplyId(null)
+    setReplyToNickname('')
+    setReplyContent('')
+    setReplyImages('')
+  }
+
+  async function handleSubmitReply(e: React.FormEvent) {
+    e.preventDefault()
+    if (!meetup || !replyToPostId || !replyContent.trim()) return
+
+    try {
+      setSubmittingReply(true)
+      const images = replyImages
+        .split('\n')
+        .map(url => url.trim())
+        .filter(url => url.length > 0)
+
+      await meetupApi.createDiscussionReply(meetup.id, replyToPostId, {
+        nickname: replyToNickname || '匿名',
+        content: replyContent.trim(),
+        images: images.length > 0 ? images : undefined,
+        parentId: replyToReplyId || undefined,
+        replyToNickname: replyToNickname || undefined,
+      })
+
+      handleCancelReply()
+      await loadDiscussionPosts()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '回复失败')
+    } finally {
+      setSubmittingReply(false)
+    }
+  }
+
+  function togglePostExpand(postId: number) {
+    setExpandedPostId(expandedPostId === postId ? null : postId)
   }
 
   if (loading) {
@@ -776,6 +895,400 @@ export default function MeetupDetail() {
           </div>
         </div>
       )}
+
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-coffee-700" />
+            <h2 className="section-title mb-0">讨论区</h2>
+            <span className="badge bg-coffee-100 text-coffee-600 ml-2">
+              {discussionPosts.length} 条讨论
+            </span>
+          </div>
+          <button
+            onClick={() => setShowPostForm(!showPostForm)}
+            className="btn-primary inline-flex items-center gap-2 text-sm"
+          >
+            <Edit3 className="w-4 h-4" />
+            发起讨论
+          </button>
+        </div>
+
+        {showPostForm && (
+          <div className="mb-6 p-5 rounded-xl bg-coffee-50/50 border border-coffee-100">
+            <form onSubmit={handleCreatePost} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">昵称 <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={newPostNickname}
+                    onChange={(e) => setNewPostNickname(e.target.value)}
+                    placeholder="请输入您的昵称"
+                    className="input-field"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label">标题 <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={newPostTitle}
+                    onChange={(e) => setNewPostTitle(e.target.value)}
+                    placeholder="请输入讨论标题"
+                    className="input-field"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="label">内容 <span className="text-red-500">*</span></label>
+                <textarea
+                  value={newPostContent}
+                  onChange={(e) => setNewPostContent(e.target.value)}
+                  placeholder="分享您的想法和见解..."
+                  rows={4}
+                  className="input-field resize-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="label flex items-center gap-1.5">
+                  <ImagePlus className="w-4 h-4 text-coffee-400" />
+                  图片链接 <span className="text-coffee-400 text-xs">（选填，每行一个）</span>
+                </label>
+                <textarea
+                  value={newPostImages}
+                  onChange={(e) => setNewPostImages(e.target.value)}
+                  placeholder="https://example.com/image1.jpg"
+                  rows={2}
+                  className="input-field resize-none font-mono text-sm"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={submittingPost || !newPostNickname.trim() || !newPostTitle.trim() || !newPostContent.trim()}
+                  className={cn(
+                    'btn-primary inline-flex items-center gap-2',
+                    (submittingPost || !newPostNickname.trim() || !newPostTitle.trim() || !newPostContent.trim()) && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  {submittingPost ? (
+                    <>发布中...</>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      发布讨论
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPostForm(false)}
+                  className="btn-secondary inline-flex items-center gap-2"
+                >
+                  取消
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {discussionLoading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="p-4 rounded-xl bg-coffee-50 animate-pulse">
+                <div className="h-5 bg-coffee-200 rounded w-1/3 mb-3" />
+                <div className="h-4 bg-coffee-100 rounded w-2/3 mb-2" />
+                <div className="h-4 bg-coffee-100 rounded w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : discussionPosts.length === 0 ? (
+          <div className="text-center py-12">
+            <MessageSquare className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+            <p className="text-coffee-400">暂无讨论，来发起第一个话题吧～</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {discussionPosts.map((post) => {
+              const isExpanded = expandedPostId === post.id
+              const isReplying = replyToPostId === post.id && !replyToReplyId
+              const topLevelReplies = post.replies.filter(r => !r.parentId)
+              const replyMap = new Map<number, MeetupDiscussionReply[]>()
+              post.replies.forEach(r => {
+                if (r.parentId) {
+                  const existing = replyMap.get(r.parentId) || []
+                  existing.push(r)
+                  replyMap.set(r.parentId, existing)
+                }
+              })
+
+              return (
+                <div
+                  key={post.id}
+                  className="border border-coffee-100 rounded-xl overflow-hidden hover:border-coffee-200 transition-colors"
+                >
+                  <div
+                    className="p-5 cursor-pointer hover:bg-coffee-50/50 transition-colors"
+                    onClick={() => togglePostExpand(post.id)}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-coffee-900 text-lg mb-2 group-hover:text-coffee-700 transition-colors">
+                          {post.title}
+                        </h3>
+                        <p className="text-coffee-600 text-sm line-clamp-2 mb-3">
+                          {post.content}
+                        </p>
+                        <div className="flex items-center gap-4 text-xs text-coffee-400">
+                          <span className="flex items-center gap-1">
+                            <User className="w-3.5 h-3.5" />
+                            {post.nickname}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            {formatDateTime(post.lastReplyAt)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            {post.replyCount} 回复
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 mt-1">
+                        {isExpanded ? (
+                          <ChevronUp className="w-5 h-5 text-coffee-400" />
+                        ) : (
+                          <ChevronDown className="w-5 h-5 text-coffee-400" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="border-t border-coffee-100 bg-coffee-50/30">
+                      <div className="p-5 pt-4">
+                        <p className="text-coffee-700 leading-relaxed whitespace-pre-wrap mb-4">
+                          {post.content}
+                        </p>
+
+                        {post.images && post.images.length > 0 && (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
+                            {post.images.map((img, idx) => (
+                              <div
+                                key={idx}
+                                className="aspect-square rounded-lg overflow-hidden bg-coffee-100 cursor-pointer hover:opacity-90 transition-opacity"
+                              >
+                                <img
+                                  src={img}
+                                  alt={`图片 ${idx + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {topLevelReplies.length > 0 && (
+                          <div className="space-y-3 mb-4">
+                            {topLevelReplies.map((reply) => {
+                              const childReplies = replyMap.get(reply.id) || []
+                              const isReplyToThis = replyToReplyId === reply.id
+
+                              return (
+                                <div key={reply.id} className="space-y-2">
+                                  <div className="flex gap-3 p-3 rounded-lg bg-white border border-coffee-100">
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-coffee-400 to-coffee-600 flex items-center justify-center flex-shrink-0">
+                                      <span className="text-white text-xs font-medium">
+                                        {reply.nickname.charAt(0)}
+                                      </span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-sm font-medium text-coffee-800">
+                                          {reply.nickname}
+                                        </span>
+                                        <span className="text-xs text-coffee-400">
+                                          {formatDateTime(reply.createdAt)}
+                                        </span>
+                                      </div>
+                                      <p className="text-sm text-coffee-600 leading-relaxed">
+                                        {reply.content}
+                                      </p>
+                                      {reply.images && reply.images.length > 0 && (
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                                          {reply.images.map((img, idx) => (
+                                            <div
+                                              key={idx}
+                                              className="aspect-square rounded-md overflow-hidden bg-coffee-100"
+                                            >
+                                              <img
+                                                src={img}
+                                                alt={`回复图片 ${idx + 1}`}
+                                                className="w-full h-full object-cover"
+                                              />
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleStartReply(post.id, reply.id, reply.nickname)
+                                        }}
+                                        className="mt-2 text-xs text-coffee-500 hover:text-coffee-700 inline-flex items-center gap-1 transition-colors"
+                                      >
+                                        <Reply className="w-3 h-3" />
+                                        回复
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {childReplies.length > 0 && (
+                                    <div className="ml-8 space-y-2">
+                                      {childReplies.map((childReply) => (
+                                        <div
+                                          key={childReply.id}
+                                          className="flex gap-2 p-3 rounded-lg bg-white/70 border border-coffee-50"
+                                        >
+                                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-brass-400 to-brass-600 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-white text-[10px] font-medium">
+                                              {childReply.nickname.charAt(0)}
+                                            </span>
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                              <span className="text-xs font-medium text-coffee-800">
+                                                {childReply.nickname}
+                                              </span>
+                                              {childReply.replyToNickname && (
+                                                <span className="text-xs text-coffee-400">
+                                                  回复 {childReply.replyToNickname}
+                                                </span>
+                                              )}
+                                              <span className="text-[10px] text-coffee-400">
+                                                {formatDateTime(childReply.createdAt)}
+                                              </span>
+                                            </div>
+                                            <p className="text-xs text-coffee-600">
+                                              {childReply.content}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {isReplyToThis && (
+                                    <form
+                                      onSubmit={handleSubmitReply}
+                                      className="ml-8 p-3 rounded-lg bg-white border border-coffee-200 space-y-2"
+                                    >
+                                      <textarea
+                                        value={replyContent}
+                                        onChange={(e) => setReplyContent(e.target.value)}
+                                        placeholder={`回复 ${reply.nickname}...`}
+                                        rows={2}
+                                        className="input-field text-sm resize-none"
+                                        autoFocus
+                                      />
+                                      <div className="flex gap-2">
+                                        <button
+                                          type="submit"
+                                          disabled={submittingReply || !replyContent.trim()}
+                                          className={cn(
+                                            'btn-primary text-xs py-1.5 px-3',
+                                            (submittingReply || !replyContent.trim()) && 'opacity-50 cursor-not-allowed'
+                                          )}
+                                        >
+                                          {submittingReply ? '发送中...' : '发送'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={handleCancelReply}
+                                          className="btn-secondary text-xs py-1.5 px-3"
+                                        >
+                                          取消
+                                        </button>
+                                      </div>
+                                    </form>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {isReplying && !replyToReplyId && (
+                          <form onSubmit={handleSubmitReply} className="space-y-3">
+                            <div>
+                              <label className="label text-sm">昵称 <span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={replyToNickname}
+                                onChange={(e) => setReplyToNickname(e.target.value)}
+                                placeholder="请输入您的昵称"
+                                className="input-field text-sm"
+                                required
+                              />
+                            </div>
+                            <textarea
+                              value={replyContent}
+                              onChange={(e) => setReplyContent(e.target.value)}
+                              placeholder="写下你的回复..."
+                              rows={3}
+                              className="input-field resize-none"
+                              autoFocus
+                            />
+                            <div className="flex gap-3">
+                              <button
+                                type="submit"
+                                disabled={submittingReply || !replyContent.trim()}
+                                className={cn(
+                                  'btn-primary inline-flex items-center gap-2 text-sm',
+                                  (submittingReply || !replyContent.trim()) && 'opacity-50 cursor-not-allowed'
+                                )}
+                              >
+                                {submittingReply ? (
+                                  <>回复中...</>
+                                ) : (
+                                  <>
+                                    <Send className="w-4 h-4" />
+                                    回复
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleCancelReply}
+                                className="btn-secondary inline-flex items-center gap-2 text-sm"
+                              >
+                                取消
+                              </button>
+                            </div>
+                          </form>
+                        )}
+
+                        {!isReplying && (
+                          <button
+                            onClick={() => handleStartReply(post.id)}
+                            className="text-sm text-coffee-600 hover:text-coffee-800 inline-flex items-center gap-1.5 transition-colors"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            回复此贴
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {selectedPhoto && (
         <div

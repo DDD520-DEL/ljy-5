@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus, Star, User, Heart, PenLine, Flame, AlertTriangle, Megaphone, CheckCircle, CalendarClock, AlertCircle } from 'lucide-react'
+import { Book, Users, Eye, MessageSquare, TrendingUp, Calendar, Clock, ChevronRight, Sparkles, BookmarkPlus, Star, User, Heart, PenLine, Flame, AlertTriangle, Megaphone, CheckCircle, CalendarClock, AlertCircle, MessageCircle, Coffee } from 'lucide-react'
 import { bookApi, meetupApi, reservationApi, noteApi } from '@/lib/api'
-import { formatDate, sourceTypeLabel, sourceTypeColor, meetupStatusLabel, meetupStatusColor, readerLevelLabel, readerLevelColor, cn, calculateDaysRemaining } from '@/lib/utils'
-import type { Book as BookType, Meetup, ReaderRanking, Note, BorrowRecordWithBook } from '../../shared/types'
+import { formatDate, sourceTypeLabel, sourceTypeColor, meetupStatusLabel, meetupStatusColor, readerLevelLabel, readerLevelColor, cn, calculateDaysRemaining, formatDateTime } from '@/lib/utils'
+import type { Book as BookType, Meetup, ReaderRanking, Note, BorrowRecordWithBook, MeetupDiscussionPost } from '../../shared/types'
 
 export default function Dashboard() {
   const [books, setBooks] = useState<BookType[]>([])
@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [overdueBorrows, setOverdueBorrows] = useState<BorrowRecordWithBook[]>([])
   const [sendingReminders, setSendingReminders] = useState<Record<number, boolean>>({})
   const [reminderSuccess, setReminderSuccess] = useState<number | null>(null)
+  const [hotDiscussionPosts, setHotDiscussionPosts] = useState<(MeetupDiscussionPost & { meetupTitle?: string; meetupStatus?: string })[]>([])
 
   useEffect(() => {
     loadData()
@@ -27,7 +28,7 @@ export default function Dashboard() {
 
   async function loadData() {
     try {
-      const [allBooks, borrowRank, discussRank, allMeetups, resStats, pointsRank, borrowCountRank, hotNotesData, activeBorrowsData, overdueBorrowsData] = await Promise.all([
+      const [allBooks, borrowRank, discussRank, allMeetups, resStats, pointsRank, borrowCountRank, hotNotesData, activeBorrowsData, overdueBorrowsData, hotDiscussionPostsData] = await Promise.all([
         bookApi.list(),
         bookApi.ranking('borrow'),
         bookApi.ranking('discuss'),
@@ -38,6 +39,7 @@ export default function Dashboard() {
         noteApi.hot(5, 7),
         bookApi.getActiveBorrows(),
         bookApi.getOverdueBorrows(),
+        meetupApi.getHotDiscussionPosts(5, 7),
       ])
       setBooks(allBooks)
       setBorrowRanking(borrowRank)
@@ -49,6 +51,7 @@ export default function Dashboard() {
       setHotNotes(hotNotesData)
       setActiveBorrows(activeBorrowsData)
       setOverdueBorrows(overdueBorrowsData)
+      setHotDiscussionPosts(hotDiscussionPostsData)
     } catch (err) {
       console.error(err)
     } finally {
@@ -429,6 +432,69 @@ export default function Dashboard() {
                       {note.commentCount}
                     </span>
                   </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="card p-6">
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center">
+            <MessageCircle className="w-4 h-4 text-white" />
+          </div>
+          <h2 className="section-title">社区动态</h2>
+          <span className="text-xs text-coffee-400 ml-2">活跃的读书会讨论</span>
+        </div>
+        {hotDiscussionPosts.length === 0 ? (
+          <div className="text-center py-12">
+            <Coffee className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+            <p className="text-coffee-400">暂无社区动态</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {hotDiscussionPosts.map((post, idx) => (
+              <Link
+                key={post.id}
+                to={`/meetups/${post.meetupId}`}
+                className="group relative p-4 rounded-xl bg-gradient-to-br from-sky-50 to-sky-100/30 border border-sky-100 hover:border-sky-200 hover:shadow-md transition-all duration-200"
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <span className={cn(
+                    'w-6 h-6 rounded-md flex items-center justify-center font-serif font-bold text-xs flex-shrink-0',
+                    idx === 0 ? 'bg-gradient-to-br from-sky-400 to-sky-600 text-white' :
+                    idx === 1 ? 'bg-gradient-to-br from-cyan-400 to-cyan-600 text-white' :
+                    idx === 2 ? 'bg-gradient-to-br from-teal-400 to-teal-600 text-white' :
+                    'bg-sky-200 text-sky-600'
+                  )}>
+                    {idx + 1}
+                  </span>
+                  <span className={cn('badge border text-[10px] py-0 px-1.5', 
+                    post.meetupStatus ? meetupStatusColor[post.meetupStatus as keyof typeof meetupStatusColor] : 'bg-coffee-100 text-coffee-600 border-coffee-200'
+                  )}>
+                    {post.meetupStatus ? meetupStatusLabel[post.meetupStatus as keyof typeof meetupStatusLabel] : '读书会'}
+                  </span>
+                </div>
+                <h3 className="font-medium text-coffee-800 text-sm line-clamp-2 mb-2 group-hover:text-coffee-600 transition-colors">
+                  {post.title}
+                </h3>
+                <p className="text-xs text-coffee-500 line-clamp-2 mb-3">
+                  {post.content}
+                </p>
+                <div className="flex items-center justify-between text-[10px] text-coffee-400">
+                  <span className="truncate">{post.nickname}</span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="flex items-center gap-0.5">
+                      <MessageSquare className="w-3 h-3" />
+                      {post.replyCount}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-2 pt-2 border-t border-sky-100">
+                  <p className="text-[10px] text-sky-600 truncate">
+                    📚 {post.meetupTitle}
+                  </p>
                 </div>
               </Link>
             ))}

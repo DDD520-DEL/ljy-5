@@ -35,6 +35,11 @@ import type {
   CreateExchangeListingRequest,
   CreateExchangeRequestRequest,
   ExchangeListingWithRequests,
+  MeetupDiscussionPost,
+  MeetupDiscussionReply,
+  MeetupDiscussionPostWithReplies,
+  CreateMeetupDiscussionPostRequest,
+  CreateMeetupDiscussionReplyRequest,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -165,6 +170,27 @@ export const meetupApi = {
     }),
   getCheckIns: (id: number) =>
     request<{ checkIns: CheckIn[]; stats: MeetupCheckInStats }>(`/meetups/${id}/checkins`),
+  getDiscussionPosts: (id: number) =>
+    request<MeetupDiscussionPostWithReplies[]>(`/meetups/${id}/discussion/posts`),
+  getDiscussionPost: (meetupId: number, postId: number) =>
+    request<MeetupDiscussionPostWithReplies>(`/meetups/${meetupId}/discussion/posts/${postId}`),
+  createDiscussionPost: (id: number, data: CreateMeetupDiscussionPostRequest) =>
+    request<{ post: MeetupDiscussionPost; pointsResult?: { account: PointsAccount; log: PointsLog; levelUp: boolean } }>(`/meetups/${id}/discussion/posts`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  createDiscussionReply: (meetupId: number, postId: number, data: CreateMeetupDiscussionReplyRequest) =>
+    request<{ reply: MeetupDiscussionReply; post: MeetupDiscussionPost }>(`/meetups/${meetupId}/discussion/posts/${postId}/replies`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getHotDiscussionPosts: (limit: number = 10, days?: number) => {
+    const params = new URLSearchParams()
+    params.set('limit', limit.toString())
+    if (days) params.set('days', days.toString())
+    const query = params.toString()
+    return request<(MeetupDiscussionPost & { meetupTitle?: string; meetupStatus?: string })[]>(`/meetups/discussion/hot?${query}`)
+  },
 }
 
 export const reservationApi = {

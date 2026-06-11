@@ -1,7 +1,7 @@
 import express from 'express'
 import QRCode from 'qrcode'
-import { getDB, addMeetup, registerMeetup, updateMeetupSummary, getPointsAccount, checkInMeetup, getCheckInsByMeetup, getMeetupCheckInStats } from '../db'
-import type { CreateMeetupRequest, RegisterMeetupRequest, UpdateMeetupSummaryRequest, CheckInRequest } from '../../shared/types'
+import { getDB, addMeetup, registerMeetup, updateMeetupSummary, getPointsAccount, checkInMeetup, getCheckInsByMeetup, getMeetupCheckInStats, getMeetupDiscussionPosts, getMeetupDiscussionPostById, getMeetupDiscussionReplies, addMeetupDiscussionPost, addMeetupDiscussionReply, getHotMeetupDiscussionPosts } from '../db'
+import type { CreateMeetupRequest, RegisterMeetupRequest, UpdateMeetupSummaryRequest, CheckInRequest, CreateMeetupDiscussionPostRequest, CreateMeetupDiscussionReplyRequest } from '../../shared/types'
 
 const router = express.Router()
 
@@ -146,6 +146,99 @@ router.put('/:id/summary', (req, res) => {
     return
   }
   res.json(meetup)
+})
+
+router.get('/:id/discussion/posts', (req, res) => {
+  const id = parseInt(req.params.id)
+  const db = getDB()
+  const meetup = db.meetups.find(m => m.id === id)
+  if (!meetup) {
+    res.status(404).json({ error: '读书会不存在' })
+    return
+  }
+  
+  const posts = getMeetupDiscussionPosts(id)
+  const postsWithReplies = posts.map(post => ({
+    ...post,
+    replies: getMeetupDiscussionReplies(post.id)
+  }))
+  res.json(postsWithReplies)
+})
+
+router.get('/:id/discussion/posts/:postId', (req, res) => {
+  const id = parseInt(req.params.id)
+  const postId = parseInt(req.params.postId)
+  const post = getMeetupDiscussionPostById(postId)
+  if (!post || post.meetupId !== id) {
+    res.status(404).json({ error: '讨论帖不存在' })
+    return
+  }
+  const replies = getMeetupDiscussionReplies(postId)
+  res.json({ ...post, replies })
+})
+
+router.post('/:id/discussion/posts', (req, res) => {
+  const id = parseInt(req.params.id)
+  const body = req.body as CreateMeetupDiscussionPostRequest
+  if (!body.nickname || !body.title || !body.content) {
+    res.status(400).json({ error: '必填字段缺失' })
+    return
+  }
+  const result = addMeetupDiscussionPost(id, {
+    nickname: body.nickname.trim(),
+    title: body.title.trim(),
+    content: body.content.trim(),
+    images: body.images,
+  })
+  if (!result) {
+    res.status(404).json({ error: '读书会不存在' })
+    return
+  }
+  res.status(201).json(result)
+})
+
+router.post('/:id/discussion/posts/:postId/replies', (req, res) => {
+  const id = parseInt(req.params.id)
+  const postId = parseInt(req.params.postId)
+  const body = req.body as CreateMeetupDiscussionReplyRequest
+  if (!body.nickname || !body.content) {
+    res.status(400).json({ error: '必填字段缺失' })
+    return
+  }
+  const post = getMeetupDiscussionPostById(postId)
+  if (!post || post.meetupId !== id) {
+    res.status(404).json({ error: '讨论帖不存在' })
+    return
+  }
+  const result = addMeetupDiscussionReply(postId, {
+    nickname: body.nickname.trim(),
+    content: body.content.trim(),
+    images: body.images,
+    parentId: body.parentId,
+    replyToNickname: body.replyToNickname,
+  })
+  if (!result) {
+    res.status(404).json({ error: '讨论帖不存在' })
+    return
+  }
+  res.status(201).json(result)
+})
+
+router.get('/discussion/hot', (req, res) => {
+  const { limit = '10', days } = req.query
+  const limitNum = parseInt(limit as string) || 10
+  const daysNum = days ? parseInt(days as string) : undefined
+  const posts = getHotMeetupDiscussionPosts(limitNum, daysNum)
+  const postsWithMeetup = posts.map(post => {
+    const db = getDB()
+    const meetup = db.meetups.find(m => m.id === post.meetupId)
+    return {
+      ...post,
+      meetupTitle: meetup?.title,
+      meetupStatus: meetup?.status,
+    }
+  })
+  res.json(postsWithMeetup)
 })
 
 export default router
