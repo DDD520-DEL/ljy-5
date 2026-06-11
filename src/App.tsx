@@ -17,6 +17,7 @@ import ExchangeMarket from "@/pages/ExchangeMarket";
 import ExchangeCreate from "@/pages/ExchangeCreate";
 import ExchangeDetail from "@/pages/ExchangeDetail";
 import ExchangeManage from "@/pages/ExchangeManage";
+import BookshelfDetail from "@/pages/BookshelfDetail";
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/trace/:traceId" element={<TraceView />} />
+        <Route path="/bookshelves/:id" element={<BookshelfDetail />} />
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/books" element={<BookList />} />

@@ -517,3 +517,68 @@ export interface CreateMeetupDiscussionReplyRequest {
   parentId?: number
   replyToNickname?: string
 }
+
+export type BookshelfVisibility = 'public' | 'private'
+
+export interface Bookshelf {
+  id: number
+  nickname: string
+  name: string
+  description?: string
+  visibility: BookshelfVisibility
+  coverImage?: string
+  bookCount: number
+  likeCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BookshelfBook {
+  id: number
+  bookshelfId: number
+  bookId: number
+  bookTitle?: string
+  bookAuthor?: string
+  bookCover?: string
+  addedAt: string
+}
+
+export interface BookshelfLike {
+  id: number
+  bookshelfId: number
+  nickname: string
+  createdAt: string
+}
+
+export interface BookshelfWithBooks extends Bookshelf {
+  books: BookshelfBook[]
+}
+
+export interface BookshelfWithOwner extends Bookshelf {
+  books: BookshelfBook[]
+  ownerLevel?: ReaderLevel
+}
+
+export interface CreateBookshelfRequest {
+  nickname: string
+  name: string
+  description?: string
+  visibility: BookshelfVisibility
+  coverImage?: string
+}
+
+export interface UpdateBookshelfRequest {
+  name?: string
+  description?: string
+  visibility?: BookshelfVisibility
+  coverImage?: string
+}
+
+export interface AddBookToBookshelfRequest {
+  bookId: number
+  nickname: string
+}
+
+export interface ToggleBookshelfLikeRequest {
+  nickname: string
+}

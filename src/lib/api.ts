@@ -42,6 +42,12 @@ import type {
   CreateMeetupDiscussionReplyRequest,
   TagStat,
   RecommendResult,
+  Bookshelf,
+  BookshelfBook,
+  BookshelfWithBooks,
+  CreateBookshelfRequest,
+  UpdateBookshelfRequest,
+  ReaderLevel,
 } from '../../shared/types'
 
 const API_BASE = '/api'
@@ -345,5 +351,62 @@ export const exchangeApi = {
     }>(`/exchanges/requests/${requestId}/complete`, {
       method: 'POST',
       body: JSON.stringify({ operator }),
+    }),
+}
+
+export const bookshelfApi = {
+  listPublic: (params?: { limit?: number; sort?: 'latest' | 'popular' }) => {
+    const qs = new URLSearchParams()
+    if (params?.limit) qs.set('limit', String(params.limit))
+    if (params?.sort) qs.set('sort', params.sort)
+    const query = qs.toString()
+    return request<(Bookshelf & { ownerLevel?: ReaderLevel })[]>(`/bookshelves/public${query ? `?${query}` : ''}`)
+  },
+  getByUser: (nickname: string, viewer?: string) => {
+    const qs = new URLSearchParams()
+    if (viewer) qs.set('viewer', viewer)
+    const query = qs.toString()
+    return request<Bookshelf[]>(`/bookshelves/user/${encodeURIComponent(nickname)}${query ? `?${query}` : ''}`)
+  },
+  getByBook: (bookId: number, nickname?: string) => {
+    const qs = new URLSearchParams()
+    if (nickname) qs.set('nickname', nickname)
+    const query = qs.toString()
+    return request<Bookshelf[]>(`/bookshelves/book/${bookId}${query ? `?${query}` : ''}`)
+  },
+  getBookMembership: (bookId: number, nickname: string) =>
+    request<{ bookshelfIds: number[] }>(`/bookshelves/book/${bookId}/membership?nickname=${encodeURIComponent(nickname)}`),
+  get: (id: number) =>
+    request<BookshelfWithBooks>(`/bookshelves/${id}`),
+  getLikes: (id: number) =>
+    request<{ nickname: string; createdAt: string; level?: ReaderLevel }[]>(`/bookshelves/${id}/likes`),
+  hasLiked: (id: number, nickname: string) =>
+    request<{ liked: boolean }>(`/bookshelves/${id}/liked?nickname=${encodeURIComponent(nickname)}`),
+  create: (data: CreateBookshelfRequest) =>
+    request<Bookshelf>('/bookshelves', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, nickname: string, data: UpdateBookshelfRequest) =>
+    request<Bookshelf>(`/bookshelves/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ nickname, ...data }),
+    }),
+  remove: (id: number, nickname: string) =>
+    request<{ success: boolean }>(`/bookshelves/${id}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ nickname }),
+    }),
+  addBook: (id: number, bookId: number, nickname: string) =>
+    request<{ success: boolean; bookshelfBook?: BookshelfBook }>(`/bookshelves/${id}/books`, {
+      method: 'POST',
+      body: JSON.stringify({ bookId, nickname }),
+    }),
+  removeBook: (id: number, bookId: number, nickname: string) =>
+    request<{ success: boolean }>(`/bookshelves/${id}/books/${bookId}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ nickname }),
+    }),
+  toggleLike: (id: number, nickname: string) =>
+    request<{ bookshelf: Bookshelf; liked: boolean }>(`/bookshelves/${id}/like`, {
+      method: 'POST',
+      body: JSON.stringify({ nickname }),
     }),
 }

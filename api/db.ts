@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat } from '../shared/types'
+import type { Book, TraceLog, Review, Meetup, Registration, Reservation, SourceType, PointsAccount, PointsLog, ReaderLevel, PointsActionType, ReaderRanking, ReaderProfile, DonationReview, Note, NoteComment, NoteLike, CreateNoteRequest, CheckIn, BorrowRecord, BorrowRecordWithBook, BookBorrowStatus, Notification, NotificationType, ExchangeListing, ExchangeRequest, BookCondition, ExchangeListingStatus, ExchangeRequestStatus, CreateExchangeListingRequest, CreateExchangeRequestRequest, MeetupDiscussionPost, MeetupDiscussionReply, TagStat, Bookshelf, BookshelfBook, BookshelfLike, BookshelfVisibility, CreateBookshelfRequest, UpdateBookshelfRequest, BookshelfWithBooks, BookshelfWithOwner } from '../shared/types'
 import { READER_LEVELS, POINTS_ACTION } from '../shared/types'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -386,6 +386,9 @@ export interface Database {
   exchangeRequests: ExchangeRequest[]
   meetupDiscussionPosts: MeetupDiscussionPost[]
   meetupDiscussionReplies: MeetupDiscussionReply[]
+  bookshelves: Bookshelf[]
+  bookshelfBooks: BookshelfBook[]
+  bookshelfLikes: BookshelfLike[]
   nextBookId: number
   nextTraceLogId: number
   nextReviewId: number
@@ -405,6 +408,9 @@ export interface Database {
   nextExchangeRequestId: number
   nextMeetupDiscussionPostId: number
   nextMeetupDiscussionReplyId: number
+  nextBookshelfId: number
+  nextBookshelfBookId: number
+  nextBookshelfLikeId: number
 }
 
 const initialCheckIns: CheckIn[] = [
@@ -519,6 +525,95 @@ const initialMeetupDiscussionReplies: MeetupDiscussionReply[] = [
   { id: 9, postId: 3, meetupId: 2, nickname: '追风筝的人', content: '期待下次读书会继续讨论～', images: [], createdAt: daysAgo(20) },
 ]
 
+const initialBookshelves: Bookshelf[] = [
+  {
+    id: 1,
+    nickname: '爱读书的猫',
+    name: '想读',
+    description: '一直想读但还没来得及读的书',
+    visibility: 'public',
+    coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=dreamy%20bookshelf%20wish%20list%20cozy%20warm%20light%20reading&image_size=landscape_4_3',
+    bookCount: 2,
+    likeCount: 5,
+    createdAt: daysAgo(30),
+    updatedAt: daysAgo(5),
+  },
+  {
+    id: 2,
+    nickname: '爱读书的猫',
+    name: '已读',
+    description: '读完的好书，值得回味',
+    visibility: 'public',
+    coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=completed%20reading%20books%20stack%20warm%20sunset%20satisfied&image_size=landscape_4_3',
+    bookCount: 3,
+    likeCount: 8,
+    createdAt: daysAgo(45),
+    updatedAt: daysAgo(3),
+  },
+  {
+    id: 3,
+    nickname: '小王子的玫瑰',
+    name: '推荐给朋友',
+    description: '朋友们一定会喜欢的精选书单',
+    visibility: 'public',
+    coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=book%20recommendation%20gift%20friends%20happy%20sharing&image_size=landscape_4_3',
+    bookCount: 2,
+    likeCount: 12,
+    createdAt: daysAgo(20),
+    updatedAt: daysAgo(7),
+  },
+  {
+    id: 4,
+    nickname: '夜读者',
+    name: '深夜读物',
+    description: '适合夜深人静时阅读的书',
+    visibility: 'private',
+    bookCount: 1,
+    likeCount: 0,
+    createdAt: daysAgo(15),
+    updatedAt: daysAgo(10),
+  },
+]
+
+const initialBookshelfBooks: BookshelfBook[] = [
+  { id: 1, bookshelfId: 1, bookId: 4, bookTitle: '人类简史', bookAuthor: '尤瓦尔·赫拉利', bookCover: initialBooks[3].coverImage, addedAt: daysAgo(20) },
+  { id: 2, bookshelfId: 1, bookId: 3, bookTitle: '追风筝的人', bookAuthor: '卡勒德·胡赛尼', bookCover: initialBooks[2].coverImage, addedAt: daysAgo(15) },
+  { id: 3, bookshelfId: 2, bookId: 1, bookTitle: '百年孤独', bookAuthor: '加西亚·马尔克斯', bookCover: initialBooks[0].coverImage, addedAt: daysAgo(40) },
+  { id: 4, bookshelfId: 2, bookId: 2, bookTitle: '小王子', bookAuthor: '安托万·德·圣-埃克苏佩里', bookCover: initialBooks[1].coverImage, addedAt: daysAgo(35) },
+  { id: 5, bookshelfId: 2, bookId: 5, bookTitle: '活着', bookAuthor: '余华', bookCover: initialBooks[4].coverImage, addedAt: daysAgo(10) },
+  { id: 6, bookshelfId: 3, bookId: 2, bookTitle: '小王子', bookAuthor: '安托万·德·圣-埃克苏佩里', bookCover: initialBooks[1].coverImage, addedAt: daysAgo(18) },
+  { id: 7, bookshelfId: 3, bookId: 5, bookTitle: '活着', bookAuthor: '余华', bookCover: initialBooks[4].coverImage, addedAt: daysAgo(12) },
+  { id: 8, bookshelfId: 4, bookId: 1, bookTitle: '百年孤独', bookAuthor: '加西亚·马尔克斯', bookCover: initialBooks[0].coverImage, addedAt: daysAgo(10) },
+]
+
+const initialBookshelfLikes: BookshelfLike[] = [
+  { id: 1, bookshelfId: 1, nickname: '夜读者', createdAt: daysAgo(25) },
+  { id: 2, bookshelfId: 1, nickname: '书虫阿明', createdAt: daysAgo(22) },
+  { id: 3, bookshelfId: 1, nickname: '小王子的玫瑰', createdAt: daysAgo(18) },
+  { id: 4, bookshelfId: 1, nickname: '文字的力量', createdAt: daysAgo(10) },
+  { id: 5, bookshelfId: 1, nickname: '不想长大', createdAt: daysAgo(8) },
+  { id: 6, bookshelfId: 2, nickname: '夜读者', createdAt: daysAgo(38) },
+  { id: 7, bookshelfId: 2, nickname: '书虫阿明', createdAt: daysAgo(30) },
+  { id: 8, bookshelfId: 2, nickname: '小王子的玫瑰', createdAt: daysAgo(25) },
+  { id: 9, bookshelfId: 2, nickname: '追风筝的人', createdAt: daysAgo(15) },
+  { id: 10, bookshelfId: 2, nickname: '文字的力量', createdAt: daysAgo(12) },
+  { id: 11, bookshelfId: 2, nickname: '不想长大', createdAt: daysAgo(8) },
+  { id: 12, bookshelfId: 2, nickname: '平凡的人', createdAt: daysAgo(5) },
+  { id: 13, bookshelfId: 2, nickname: '童话少女', createdAt: daysAgo(3) },
+  { id: 14, bookshelfId: 3, nickname: '爱读书的猫', createdAt: daysAgo(18) },
+  { id: 15, bookshelfId: 3, nickname: '夜读者', createdAt: daysAgo(15) },
+  { id: 16, bookshelfId: 3, nickname: '书虫阿明', createdAt: daysAgo(14) },
+  { id: 17, bookshelfId: 3, nickname: '文字的力量', createdAt: daysAgo(12) },
+  { id: 18, bookshelfId: 3, nickname: '追风筝的人', createdAt: daysAgo(10) },
+  { id: 19, bookshelfId: 3, nickname: '不想长大', createdAt: daysAgo(9) },
+  { id: 20, bookshelfId: 3, nickname: '平凡的人', createdAt: daysAgo(8) },
+  { id: 21, bookshelfId: 3, nickname: '童话少女', createdAt: daysAgo(7) },
+  { id: 22, bookshelfId: 3, nickname: '读书人小刘', createdAt: daysAgo(6) },
+  { id: 23, bookshelfId: 3, nickname: '文学爱好者', createdAt: daysAgo(5) },
+  { id: 24, bookshelfId: 3, nickname: '书虫阿明', createdAt: daysAgo(4) },
+  { id: 25, bookshelfId: 3, nickname: '夜读者', createdAt: daysAgo(3) },
+]
+
 const initialDB: Database = {
   books: initialBooks,
   traceLogs: initialTraceLogs,
@@ -541,6 +636,9 @@ const initialDB: Database = {
   exchangeRequests: initialExchangeRequests,
   meetupDiscussionPosts: initialMeetupDiscussionPosts,
   meetupDiscussionReplies: initialMeetupDiscussionReplies,
+  bookshelves: initialBookshelves,
+  bookshelfBooks: initialBookshelfBooks,
+  bookshelfLikes: initialBookshelfLikes,
   nextBookId: 6,
   nextTraceLogId: 9,
   nextReviewId: 9,
@@ -560,6 +658,9 @@ const initialDB: Database = {
   nextExchangeRequestId: 3,
   nextMeetupDiscussionPostId: 4,
   nextMeetupDiscussionReplyId: 10,
+  nextBookshelfId: 5,
+  nextBookshelfBookId: 9,
+  nextBookshelfLikeId: 26,
 }
 
 let db: Database = initialDB
@@ -636,9 +737,30 @@ function loadDB(): Database {
         console.log('[DB Migration] 初始化读书会讨论帖数据')
       }
       
+      if (!parsed.bookshelves) {
+        parsed.bookshelves = initialBookshelves
+        parsed.bookshelfBooks = initialBookshelfBooks
+        parsed.bookshelfLikes = initialBookshelfLikes
+        parsed.nextBookshelfId = 5
+        parsed.nextBookshelfBookId = 9
+        parsed.nextBookshelfLikeId = 26
+        saveDB(parsed as Database)
+        console.log('[DB Migration] 初始化书单数据')
+      }
+      
+      if (parsed.nextBookshelfId === undefined) {
+        parsed.nextBookshelfId = (parsed.bookshelves?.length || 0) + 1
+      }
+      if (parsed.nextBookshelfBookId === undefined) {
+        parsed.nextBookshelfBookId = (parsed.bookshelfBooks?.length || 0) + 1
+      }
+      if (parsed.nextBookshelfLikeId === undefined) {
+        parsed.nextBookshelfLikeId = (parsed.bookshelfLikes?.length || 0) + 1
+      }
+      
       console.log(`[DB] 已从 ${DATA_FILE} 加载数据`)
       console.log(`[DB] 图书: ${parsed.books?.length || 0} 本 | 读书会: ${parsed.meetups?.length || 0} 个 | 短评: ${parsed.reviews?.length || 0} 条 | 笔记: ${parsed.notes?.length || 0} 条`)
-      console.log(`[DB] 借阅记录: ${parsed.borrowRecords?.length || 0} 条 | 通知: ${parsed.notifications?.length || 0} 条 | 讨论帖: ${parsed.meetupDiscussionPosts?.length || 0} 条`)
+      console.log(`[DB] 借阅记录: ${parsed.borrowRecords?.length || 0} 条 | 通知: ${parsed.notifications?.length || 0} 条 | 讨论帖: ${parsed.meetupDiscussionPosts?.length || 0} 条 | 书单: ${parsed.bookshelves?.length || 0} 个`)
       return parsed as Database
     } catch (err) {
       console.error('[DB] 数据文件读取失败，使用初始数据:', err)
@@ -2071,6 +2193,205 @@ export function getHotMeetupDiscussionPosts(limit: number = 10, days?: number): 
       return hotB - hotA
     })
     .slice(0, limit)
+}
+
+export function createBookshelf(data: CreateBookshelfRequest): Bookshelf {
+  const now = new Date().toISOString()
+  const bookshelf: Bookshelf = {
+    id: db.nextBookshelfId++,
+    nickname: data.nickname,
+    name: data.name,
+    description: data.description,
+    visibility: data.visibility,
+    coverImage: data.coverImage,
+    bookCount: 0,
+    likeCount: 0,
+    createdAt: now,
+    updatedAt: now,
+  }
+  db.bookshelves.push(bookshelf)
+  persistDB()
+  console.log(`[Bookshelf] 创建书单: ${data.name} (创建者: ${data.nickname})`)
+  return bookshelf
+}
+
+export function getBookshelfById(id: number): BookshelfWithBooks | null {
+  const bookshelf = db.bookshelves.find(b => b.id === id)
+  if (!bookshelf) return null
+  const books = db.bookshelfBooks
+    .filter(b => b.bookshelfId === id)
+    .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
+  return { ...bookshelf, books }
+}
+
+export function getBookshelvesByUser(nickname: string, viewer?: string): Bookshelf[] {
+  let shelves = db.bookshelves
+    .filter(b => b.nickname === nickname)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+  if (viewer !== nickname) {
+    shelves = shelves.filter(b => b.visibility === 'public')
+  }
+  return shelves
+}
+
+export function getBookshelvesByBook(bookId: number, nickname?: string): Bookshelf[] {
+  const bookShelfIds = new Set(
+    db.bookshelfBooks
+      .filter(b => b.bookId === bookId)
+      .map(b => b.bookshelfId)
+  )
+  let shelves = db.bookshelves.filter(b => bookShelfIds.has(b.id))
+  if (nickname) {
+    shelves = shelves.filter(b => b.visibility === 'public' || b.nickname === nickname)
+  } else {
+    shelves = shelves.filter(b => b.visibility === 'public')
+  }
+  return shelves.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+}
+
+export function getPublicBookshelves(limit: number = 20, sortBy: 'latest' | 'popular' = 'latest'): (Bookshelf & { ownerLevel?: ReaderLevel })[] {
+  let shelves = db.bookshelves.filter(b => b.visibility === 'public')
+  if (sortBy === 'popular') {
+    shelves = shelves.sort((a, b) => b.likeCount - a.likeCount || new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+  } else {
+    shelves = shelves.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+  }
+  return shelves.slice(0, limit).map(shelf => {
+    const account = getPointsAccount(shelf.nickname)
+    return { ...shelf, ownerLevel: account?.level }
+  })
+}
+
+export function updateBookshelf(id: number, nickname: string, data: UpdateBookshelfRequest): Bookshelf | null {
+  const bookshelf = db.bookshelves.find(b => b.id === id)
+  if (!bookshelf || bookshelf.nickname !== nickname) return null
+  if (data.name !== undefined) bookshelf.name = data.name
+  if (data.description !== undefined) bookshelf.description = data.description
+  if (data.visibility !== undefined) bookshelf.visibility = data.visibility
+  if (data.coverImage !== undefined) bookshelf.coverImage = data.coverImage
+  bookshelf.updatedAt = new Date().toISOString()
+  persistDB()
+  console.log(`[Bookshelf] 更新书单: ID ${id}`)
+  return bookshelf
+}
+
+export function deleteBookshelf(id: number, nickname: string): boolean {
+  const index = db.bookshelves.findIndex(b => b.id === id && b.nickname === nickname)
+  if (index === -1) return false
+  db.bookshelves.splice(index, 1)
+  const booksToDelete = db.bookshelfBooks.filter(b => b.bookshelfId === id)
+  db.bookshelfBooks = db.bookshelfBooks.filter(b => b.bookshelfId !== id)
+  const likesToDelete = db.bookshelfLikes.filter(l => l.bookshelfId === id)
+  db.bookshelfLikes = db.bookshelfLikes.filter(l => l.bookshelfId !== id)
+  persistDB()
+  console.log(`[Bookshelf] 删除书单: ID ${id}, 删除 ${booksToDelete.length} 本图书, ${likesToDelete.length} 个点赞`)
+  return true
+}
+
+export function addBookToBookshelf(bookshelfId: number, bookId: number, nickname: string): { success: boolean; bookshelfBook?: BookshelfBook; error?: string } {
+  const bookshelf = db.bookshelves.find(b => b.id === bookshelfId)
+  if (!bookshelf) return { success: false, error: '书单不存在' }
+  if (bookshelf.nickname !== nickname) return { success: false, error: '无权操作此书单' }
+  const book = db.books.find(b => b.id === bookId)
+  if (!book) return { success: false, error: '图书不存在' }
+  const existing = db.bookshelfBooks.find(b => b.bookshelfId === bookshelfId && b.bookId === bookId)
+  if (existing) return { success: false, error: '该书已在书单中' }
+  const now = new Date().toISOString()
+  const bookshelfBook: BookshelfBook = {
+    id: db.nextBookshelfBookId++,
+    bookshelfId,
+    bookId,
+    bookTitle: book.title,
+    bookAuthor: book.author,
+    bookCover: book.coverImage,
+    addedAt: now,
+  }
+  db.bookshelfBooks.push(bookshelfBook)
+  bookshelf.bookCount++
+  bookshelf.updatedAt = now
+  persistDB()
+  console.log(`[Bookshelf] 添加图书: ${book.title} -> 书单 ${bookshelf.name}`)
+  return { success: true, bookshelfBook }
+}
+
+export function removeBookFromBookshelf(bookshelfId: number, bookId: number, nickname: string): boolean {
+  const bookshelf = db.bookshelves.find(b => b.id === bookshelfId)
+  if (!bookshelf || bookshelf.nickname !== nickname) return false
+  const index = db.bookshelfBooks.findIndex(b => b.bookshelfId === bookshelfId && b.bookId === bookId)
+  if (index === -1) return false
+  db.bookshelfBooks.splice(index, 1)
+  bookshelf.bookCount = Math.max(0, bookshelf.bookCount - 1)
+  bookshelf.updatedAt = new Date().toISOString()
+  persistDB()
+  console.log(`[Bookshelf] 移除图书: 图书#${bookId} -> 书单#${bookshelfId}`)
+  return true
+}
+
+export function isBookInBookshelf(bookshelfId: number, bookId: number): boolean {
+  return db.bookshelfBooks.some(b => b.bookshelfId === bookshelfId && b.bookId === bookId)
+}
+
+export function getBookshelfMembership(bookId: number, nickname: string): number[] {
+  const userShelfIds = new Set(
+    db.bookshelves
+      .filter(b => b.nickname === nickname)
+      .map(b => b.id)
+  )
+  return db.bookshelfBooks
+    .filter(b => b.bookId === bookId && userShelfIds.has(b.bookshelfId))
+    .map(b => b.bookshelfId)
+}
+
+export function toggleBookshelfLike(bookshelfId: number, nickname: string): { bookshelf: Bookshelf; liked: boolean } | null {
+  const bookshelf = db.bookshelves.find(b => b.id === bookshelfId)
+  if (!bookshelf) return null
+  const existingIndex = db.bookshelfLikes.findIndex(l => l.bookshelfId === bookshelfId && l.nickname === nickname)
+  let liked: boolean
+  if (existingIndex !== -1) {
+    db.bookshelfLikes.splice(existingIndex, 1)
+    bookshelf.likeCount = Math.max(0, bookshelf.likeCount - 1)
+    liked = false
+  } else {
+    const like: BookshelfLike = {
+      id: db.nextBookshelfLikeId++,
+      bookshelfId,
+      nickname,
+      createdAt: new Date().toISOString(),
+    }
+    db.bookshelfLikes.push(like)
+    bookshelf.likeCount++
+    liked = true
+    if (bookshelf.nickname !== nickname) {
+      createNotification(
+        bookshelf.nickname,
+        'note_like',
+        '你的书单有新点赞',
+        `读者「${nickname}」点赞了你的书单《${bookshelf.name}》。`,
+        undefined,
+        undefined,
+        bookshelfId,
+        'bookshelf'
+      )
+    }
+  }
+  bookshelf.updatedAt = new Date().toISOString()
+  persistDB()
+  console.log(`[Bookshelf] 点赞切换: 书单#${bookshelfId} -> ${liked ? '已点赞' : '已取消'}`)
+  return { bookshelf, liked }
+}
+
+export function hasLikedBookshelf(bookshelfId: number, nickname: string): boolean {
+  return db.bookshelfLikes.some(l => l.bookshelfId === bookshelfId && l.nickname === nickname)
+}
+
+export function getBookshelfLikes(bookshelfId: number): { nickname: string; createdAt: string; level?: ReaderLevel }[] {
+  return db.bookshelfLikes
+    .filter(l => l.bookshelfId === bookshelfId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .map(l => {
+      const account = getPointsAccount(l.nickname)
+      return { nickname: l.nickname, createdAt: l.createdAt, level: account?.level }
+    })
 }
 
 export function deleteMeetupDiscussionPost(id: number): boolean {

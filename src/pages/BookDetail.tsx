@@ -34,6 +34,8 @@ import {
   Tag,
 } from 'lucide-react'
 import { bookApi, reservationApi, noteApi } from '@/lib/api'
+import { BookshelfSelector } from '@/components/BookshelfSelector'
+import { useReaderStore } from '@/hooks/useReaderStore'
 import {
   formatDateTime,
   formatDate,
@@ -54,8 +56,10 @@ import type { Book as BookType, TraceLog, Review, Reservation, ReviewWithLevel, 
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const currentNickname = useReaderStore(s => s.nickname)
 
   const [book, setBook] = useState<BookType | null>(null)
+  const [showBookshelfSelector, setShowBookshelfSelector] = useState(false)
   const [traceLogs, setTraceLogs] = useState<TraceLog[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
   const [qrcodeData, setQrcodeData] = useState<{ qrcode: string; traceId: string; traceUrl: string } | null>(null)
@@ -584,6 +588,31 @@ export default function BookDetail() {
                 <p className="text-xs text-coffee-500 mt-0.5">讨论热度</p>
               </div>
             </div>
+          </div>
+
+          <div className="card p-6">
+            <h3 className="section-title flex items-center gap-2 mb-4">
+              <BookmarkPlus className="w-4 h-4" />
+              收藏到书单
+            </h3>
+            <button
+              onClick={() => {
+                if (!currentNickname) {
+                  alert('请先在右上角选择读者身份')
+                  return
+                }
+                setShowBookshelfSelector(true)
+              }}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-medium hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 flex items-center justify-center gap-2 hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              <BookmarkPlus className="w-5 h-5" />
+              加入我的书单
+            </button>
+            {currentNickname && (
+              <p className="text-xs text-coffee-400 mt-2 text-center">
+                当前身份：<span className="font-medium text-coffee-600">{currentNickname}</span>
+              </p>
+            )}
           </div>
 
           <div className="card p-6">
@@ -1597,6 +1626,13 @@ export default function BookDetail() {
           </div>
         </div>
       )}
+
+      <BookshelfSelector
+        book={book!}
+        nickname={currentNickname}
+        open={showBookshelfSelector}
+        onClose={() => setShowBookshelfSelector(false)}
+      />
     </div>
   )
 }

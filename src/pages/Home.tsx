@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
-import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, ChevronRight, BookMarked, Star, User, Tag, Eye } from 'lucide-react'
+import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, ChevronRight, BookMarked, Star, User, Tag, Eye, Globe } from 'lucide-react'
 import NotificationCenter from '@/components/NotificationCenter'
 import { useState, useEffect, useRef } from 'react'
-import { bookApi } from '@/lib/api'
+import { bookApi, bookshelfApi } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type { Book as BookType } from '../../shared/types'
+import type { Book as BookType, Bookshelf } from '../../shared/types'
 
 export default function Home() {
   const [nickname, setNickname] = useState<string>('爱读书的猫')
@@ -13,6 +13,8 @@ export default function Home() {
   const [recommendBooks, setRecommendBooks] = useState<BookType[]>([])
   const [recommendReason, setRecommendReason] = useState('')
   const [recommendLoading, setRecommendLoading] = useState(true)
+  const [popularBookshelves, setPopularBookshelves] = useState<Bookshelf[]>([])
+  const [bookshelvesLoading, setBookshelvesLoading] = useState(true)
 
   useEffect(() => {
     async function loadRecommendations() {
@@ -29,6 +31,21 @@ export default function Home() {
     }
     loadRecommendations()
   }, [nickname])
+
+  useEffect(() => {
+    async function loadPopularBookshelves() {
+      try {
+        setBookshelvesLoading(true)
+        const result = await bookshelfApi.listPublic({ limit: 4, sort: 'popular' })
+        setPopularBookshelves(result)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setBookshelvesLoading(false)
+      }
+    }
+    loadPopularBookshelves()
+  }, [])
 
   const readerNicknames = [
     '爱读书的猫',
@@ -343,6 +360,99 @@ export default function Home() {
               <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
+        </div>
+      </section>
+
+      <section className="py-20 px-4 bg-gradient-to-b from-coffee-50/50 to-white">
+        <div className="container max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm border border-indigo-200 mb-4 shadow-sm">
+              <BookMarked className="w-4 h-4 text-indigo-500" />
+              <span className="text-sm text-indigo-700">精选书单</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-serif font-bold text-coffee-900 mb-3">
+              热门公开书单
+            </h2>
+            <p className="text-coffee-600 max-w-xl mx-auto">
+              发现其他读者精心整理的书单，找到你的下一本好书
+            </p>
+          </div>
+
+          {bookshelvesLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="aspect-video bg-coffee-100 rounded-xl mb-3" />
+                  <div className="h-5 bg-coffee-100 rounded w-3/4 mb-2" />
+                  <div className="h-4 bg-coffee-100 rounded w-1/2 mb-2" />
+                  <div className="h-3 bg-coffee-100 rounded w-full mb-3" />
+                  <div className="flex gap-4">
+                    <div className="h-3 bg-coffee-100 rounded w-12" />
+                    <div className="h-3 bg-coffee-100 rounded w-12" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : popularBookshelves.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {popularBookshelves.map((bookshelf) => (
+                <Link
+                  key={bookshelf.id}
+                  to={`/bookshelves/${bookshelf.id}`}
+                  className="group"
+                >
+                  <div className="aspect-video rounded-xl overflow-hidden bg-gradient-to-br from-indigo-100 to-purple-100 mb-4 relative shadow-sm group-hover:shadow-lg transition-all duration-300 group-hover:-translate-y-1">
+                    {bookshelf.coverImage ? (
+                      <img
+                        src={bookshelf.coverImage}
+                        alt={bookshelf.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-400 to-purple-500">
+                        <BookMarked className="w-12 h-12 text-white/80" />
+                      </div>
+                    )}
+                    <div className="absolute top-3 right-3">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/90 backdrop-blur-sm text-[10px] font-medium text-emerald-700 border border-emerald-200">
+                        <Globe className="w-3 h-3" />
+                        公开
+                      </span>
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h4 className="font-bold text-coffee-800 truncate group-hover:text-indigo-600 transition-colors">
+                      {bookshelf.name}
+                    </h4>
+                  </div>
+                  <p className="text-xs text-coffee-500 mb-2">by {bookshelf.nickname}</p>
+                  {bookshelf.description && (
+                    <p className="text-sm text-coffee-600 line-clamp-2 mb-3">
+                      {bookshelf.description}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between text-xs text-coffee-500">
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex items-center gap-1">
+                        <BookOpen className="w-3.5 h-3.5" />
+                        {bookshelf.bookCount} 本
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Heart className="w-3.5 h-3.5" />
+                        {bookshelf.likeCount}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <BookMarked className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+              <p className="text-coffee-400">暂无公开书单</p>
+            </div>
+          )}
         </div>
       </section>
       

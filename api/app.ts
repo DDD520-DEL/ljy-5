@@ -16,6 +16,7 @@ import reservationsRoutes from './routes/reservations.js'
 import donationsRoutes from './routes/donations.js'
 import notesRoutes from './routes/notes.js'
 import exchangesRoutes from './routes/exchanges.js'
+import bookshelvesRoutes from './routes/bookshelves.js'
 
 // load env
 dotenv.config()
@@ -36,6 +37,7 @@ app.use('/api/reservations', reservationsRoutes)
 app.use('/api/donations', donationsRoutes)
 app.use('/api/notes', notesRoutes)
 app.use('/api/exchanges', exchangesRoutes)
+app.use('/api/bookshelves', bookshelvesRoutes)
 
 /**
  * health

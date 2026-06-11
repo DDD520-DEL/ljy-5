@@ -27,8 +27,9 @@ import {
   CalendarClock,
   Bell,
   Mail,
+  BookMarked,
 } from 'lucide-react'
-import { bookApi } from '@/lib/api'
+import { bookApi, bookshelfApi } from '@/lib/api'
 import {
   formatDate,
   formatDateTime,
@@ -45,7 +46,7 @@ import {
   cn,
   calculateDaysRemaining,
 } from '@/lib/utils'
-import type { ReaderProfile as ReaderProfileType, Review, PointsLog, DonationReview, Note, BorrowRecordWithBook, Notification } from '../../shared/types'
+import type { ReaderProfile as ReaderProfileType, Review, PointsLog, DonationReview, Note, BorrowRecordWithBook, Notification, Bookshelf } from '../../shared/types'
 
 export default function ReaderProfile() {
   const { nickname } = useParams<{ nickname: string }>()
@@ -53,23 +54,26 @@ export default function ReaderProfile() {
   const [profile, setProfile] = useState<ReaderProfileType | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'history' | 'borrow' | 'current' | 'overdue' | 'reviews' | 'notes' | 'meetups' | 'donations' | 'notifications'>('history')
+  const [activeTab, setActiveTab] = useState<'history' | 'borrow' | 'current' | 'overdue' | 'reviews' | 'notes' | 'meetups' | 'donations' | 'notifications' | 'bookshelves'>('history')
   const [activeBorrows, setActiveBorrows] = useState<BorrowRecordWithBook[]>([])
   const [overdueBorrows, setOverdueBorrows] = useState<BorrowRecordWithBook[]>([])
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [markingRead, setMarkingRead] = useState<Record<number, boolean>>({})
+  const [bookshelves, setBookshelves] = useState<Bookshelf[]>([])
 
   const loadProfile = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
       const decodedNickname = decodeURIComponent(nickname!)
-      const [profileData, notifData] = await Promise.all([
+      const [profileData, notifData, bookshelfData] = await Promise.all([
         bookApi.readerProfile(decodedNickname),
         bookApi.getNotifications(decodedNickname).catch(() => []),
+        bookshelfApi.getByUser(decodedNickname).catch(() => []),
       ])
       setProfile(profileData)
       setNotifications(notifData)
+      setBookshelves(bookshelfData)
       const allActive = profileData.currentBorrowings || []
       setActiveBorrows(allActive)
       setOverdueBorrows(allActive.filter(b => b.status === 'overdue'))
@@ -148,7 +152,7 @@ export default function ReaderProfile() {
   ]
 
   const tabs: Array<{
-    id: 'history' | 'borrow' | 'current' | 'overdue' | 'reviews' | 'notes' | 'meetups' | 'donations' | 'notifications'
+    id: 'history' | 'borrow' | 'current' | 'overdue' | 'reviews' | 'notes' | 'meetups' | 'donations' | 'notifications' | 'bookshelves'
     label: string
     icon: any
     count: number
@@ -163,6 +167,7 @@ export default function ReaderProfile() {
     { id: 'notifications', label: '通知中心', icon: Bell, count: notifications.length, badge: notifications.filter(n => !n.read).length > 0 ? { count: notifications.filter(n => !n.read).length, color: 'bg-red-500 text-white' } : undefined },
     { id: 'meetups', label: '读书会', icon: Users, count: meetups.length },
     { id: 'donations', label: '捐赠图书', icon: Gift, count: donations.length + (donationReviews?.length || 0) },
+    { id: 'bookshelves', label: '我的书单', icon: BookMarked, count: bookshelves.length },
   ]
 
   return (
@@ -859,6 +864,99 @@ export default function ReaderProfile() {
                       </div>
                     ) : null}
                   </div>
+                </div>
+              )}
+
+              {activeTab === 'bookshelves' && (
+                <div className="space-y-4">
+                  {bookshelves.length === 0 ? (
+                    <div className="text-center py-12">
+                      <BookMarked className="w-12 h-12 text-coffee-200 mx-auto mb-3" />
+                      <p className="text-coffee-400">暂无书单</p>
+                      <p className="text-xs text-coffee-400 mt-1">在图书详情页点击"加入书单"创建你的第一个书单吧</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {bookshelves.map((bookshelf) => (
+                        <Link
+                          key={bookshelf.id}
+                          to={`/bookshelves/${bookshelf.id}`}
+                          className={cn(
+                            'block p-5 rounded-xl border group transition-all hover:shadow-md',
+                            bookshelf.visibility === 'public'
+                              ? 'bg-white border-coffee-100 hover:border-coffee-300'
+                              : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-bold text-coffee-800 truncate group-hover:text-coffee-600 transition-colors">
+                                  {bookshelf.name}
+                                </h4>
+                                <span className={cn(
+                                  'badge border text-[10px] flex-shrink-0',
+                                  bookshelf.visibility === 'public'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : 'bg-gray-100 text-gray-600 border-gray-200'
+                                )}>
+                                  {bookshelf.visibility === 'public' ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Globe className="w-3 h-3" />
+                                      公开
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Lock className="w-3 h-3" />
+                                      私密
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                              {bookshelf.description && (
+                                <p className="text-sm text-coffee-500 line-clamp-2">{bookshelf.description}</p>
+                              )}
+                            </div>
+                            <div className={cn(
+                              'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
+                              bookshelf.visibility === 'public'
+                                ? 'bg-gradient-to-br from-indigo-400 to-indigo-600 text-white'
+                                : 'bg-gray-200 text-gray-500'
+                            )}>
+                              <BookMarked className="w-5 h-5" />
+                            </div>
+                          </div>
+
+                          {bookshelf.coverImage && (
+                            <div className="aspect-video rounded-lg overflow-hidden mb-3 bg-coffee-100">
+                              <img
+                                src={bookshelf.coverImage}
+                                alt={bookshelf.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between text-xs text-coffee-500">
+                            <div className="flex items-center gap-4">
+                              <span className="inline-flex items-center gap-1">
+                                <Book className="w-3.5 h-3.5" />
+                                {bookshelf.bookCount} 本
+                              </span>
+                              <span className="inline-flex items-center gap-1">
+                                <Heart className="w-3.5 h-3.5" />
+                                {bookshelf.likeCount}
+                              </span>
+                            </div>
+                            <span className="inline-flex items-center gap-1">
+                              <Calendar className="w-3.5 h-3.5" />
+                              {formatDate(bookshelf.createdAt)}
+                            </span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

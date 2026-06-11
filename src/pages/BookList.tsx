@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Search, Filter, Plus, Book, Grid3X3, List, Eye, MessageSquare, Tag, X } from 'lucide-react'
+import { Search, Filter, Plus, Book, Grid3X3, List, Eye, MessageSquare, Tag, X, BookmarkPlus } from 'lucide-react'
 import { bookApi } from '@/lib/api'
 import { sourceTypeLabel, sourceTypeColor, cn } from '@/lib/utils'
 import type { Book as BookType, SourceType, TagStat } from '../../shared/types'
+import { BookshelfSelector } from '@/components/BookshelfSelector'
+import { useReaderStore } from '@/hooks/useReaderStore'
 
 type SourceFilter = 'all' | SourceType
 type ViewMode = 'grid' | 'list'
@@ -18,6 +20,8 @@ export default function BookList() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [tagStats, setTagStats] = useState<TagStat[]>([])
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
+  const currentNickname = useReaderStore(s => s.nickname)
+  const [selectorBook, setSelectorBook] = useState<BookType | null>(null)
 
   useEffect(() => {
     loadBooks()
@@ -267,7 +271,7 @@ export default function BookList() {
         <>
           <div className="hidden md:hidden">
             {filteredBooks.map((book) => (
-              <BookCardList key={book.id} book={book} />
+              <BookCardList key={book.id} book={book} onAddBookshelf={() => setSelectorBook(book)} />
             ))}
           </div>
           <div className={cn(
@@ -278,90 +282,110 @@ export default function BookList() {
           )}>
             {filteredBooks.map((book) =>
               viewMode === 'grid' ? (
-                <BookCardGrid key={book.id} book={book} />
+                <BookCardGrid key={book.id} book={book} onAddBookshelf={() => setSelectorBook(book)} />
               ) : (
-                <BookCardList key={book.id} book={book} />
+                <BookCardList key={book.id} book={book} onAddBookshelf={() => setSelectorBook(book)} />
               )
             )}
           </div>
         </>
       )}
+
+      <BookshelfSelector
+        book={selectorBook!}
+        nickname={currentNickname}
+        open={!!selectorBook}
+        onClose={() => setSelectorBook(null)}
+      />
     </div>
   )
 }
 
-function BookCardGrid({ book }: { book: BookType }) {
+function BookCardGrid({ book, onAddBookshelf }: { book: BookType; onAddBookshelf: () => void }) {
   return (
-    <Link
-      to={`/books/${book.id}`}
+    <div
       className={cn(
-        'card p-4 group cursor-pointer',
+        'card p-4 group',
         'hover:-translate-y-1 hover:shadow-card transition-all duration-300'
       )}
     >
-      <div className="aspect-[3/4] rounded-lg overflow-hidden bg-coffee-100 mb-4 relative">
-        {book.coverImage ? (
-          <img
-            src={book.coverImage}
-            alt={book.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-coffee-300">
-            <Book className="w-12 h-12" />
+      <Link to={`/books/${book.id}`} className="block">
+        <div className="aspect-[3/4] rounded-lg overflow-hidden bg-coffee-100 mb-4 relative">
+          {book.coverImage ? (
+            <img
+              src={book.coverImage}
+              alt={book.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-coffee-300">
+              <Book className="w-12 h-12" />
+            </div>
+          )}
+          <div className="absolute top-2 right-2">
+            <span className={cn('badge border', sourceTypeColor[book.sourceType])}>
+              {sourceTypeLabel[book.sourceType]}
+            </span>
+          </div>
+        </div>
+        <h3 className="font-medium text-coffee-900 truncate group-hover:text-coffee-700 transition-colors line-clamp-1">
+          {book.title}
+        </h3>
+        <p className="text-sm text-coffee-500 mt-0.5 truncate">{book.author}</p>
+        {book.tags && book.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {book.tags.slice(0, 3).map((tag) => (
+              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gradient-to-r from-coffee-50 to-brass-400/10 text-coffee-600 border border-coffee-100">
+                {tag}
+              </span>
+            ))}
+            {book.tags.length > 3 && (
+              <span className="text-[10px] px-1.5 py-0.5 text-coffee-400">+{book.tags.length - 3}</span>
+            )}
           </div>
         )}
-        <div className="absolute top-2 right-2">
-          <span className={cn('badge border', sourceTypeColor[book.sourceType])}>
-            {sourceTypeLabel[book.sourceType]}
-          </span>
-        </div>
-      </div>
-      <h3 className="font-medium text-coffee-900 truncate group-hover:text-coffee-700 transition-colors line-clamp-1">
-        {book.title}
-      </h3>
-      <p className="text-sm text-coffee-500 mt-0.5 truncate">{book.author}</p>
-      {book.tags && book.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-2">
-          {book.tags.slice(0, 3).map((tag) => (
-            <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gradient-to-r from-coffee-50 to-brass-400/10 text-coffee-600 border border-coffee-100">
-              {tag}
-            </span>
-          ))}
-          {book.tags.length > 3 && (
-            <span className="text-[10px] px-1.5 py-0.5 text-coffee-400">+{book.tags.length - 3}</span>
-          )}
-        </div>
-      )}
+      </Link>
       <div className="flex items-center justify-between mt-3">
         <span className="text-xs text-coffee-400 bg-coffee-50 px-2 py-1 rounded">
           {book.category}
         </span>
-        <div className="flex items-center gap-3 text-xs text-coffee-500">
-          <span className="flex items-center gap-1">
-            <Eye className="w-3 h-3" />
-            {book.borrowCount}
-          </span>
-          <span className="flex items-center gap-1">
-            <MessageSquare className="w-3 h-3" />
-            {book.discussCount}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 text-xs text-coffee-500">
+            <span className="flex items-center gap-1">
+              <Eye className="w-3 h-3" />
+              {book.borrowCount}
+            </span>
+            <span className="flex items-center gap-1">
+              <MessageSquare className="w-3 h-3" />
+              {book.discussCount}
+            </span>
+          </div>
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onAddBookshelf()
+            }}
+            className="p-1.5 rounded-lg text-coffee-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+            title="加入书单"
+          >
+            <BookmarkPlus className="w-4 h-4" />
+          </button>
         </div>
       </div>
-    </Link>
+    </div>
   )
 }
 
-function BookCardList({ book }: { book: BookType }) {
+function BookCardList({ book, onAddBookshelf }: { book: BookType; onAddBookshelf: () => void }) {
   return (
-    <Link
-      to={`/books/${book.id}`}
+    <div
       className={cn(
-        'card p-4 group cursor-pointer flex gap-4',
+        'card p-4 group flex gap-4',
         'hover:shadow-card transition-all duration-300'
       )}
     >
-      <div className="w-20 h-28 sm:w-24 sm:h-32 flex-shrink-0 rounded-lg overflow-hidden bg-coffee-100">
+      <Link to={`/books/${book.id}`} className="w-20 h-28 sm:w-24 sm:h-32 flex-shrink-0 rounded-lg overflow-hidden bg-coffee-100">
         {book.coverImage ? (
           <img
             src={book.coverImage}
@@ -373,15 +397,15 @@ function BookCardList({ book }: { book: BookType }) {
             <Book className="w-8 h-8" />
           </div>
         )}
-      </div>
+      </Link>
       <div className="flex-1 min-w-0 flex flex-col">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
+          <Link to={`/books/${book.id}`} className="min-w-0 flex-1">
             <h3 className="font-medium text-coffee-900 truncate group-hover:text-coffee-700 transition-colors">
               {book.title}
             </h3>
             <p className="text-sm text-coffee-500 mt-0.5">{book.author}</p>
-          </div>
+          </Link>
           <span className={cn('badge border flex-shrink-0', sourceTypeColor[book.sourceType])}>
             {sourceTypeLabel[book.sourceType]}
           </span>
@@ -412,9 +436,20 @@ function BookCardList({ book }: { book: BookType }) {
               <MessageSquare className="w-3 h-3" />
               {book.discussCount} 条讨论
             </span>
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onAddBookshelf()
+              }}
+              className="p-1.5 rounded-lg text-coffee-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+              title="加入书单"
+            >
+              <BookmarkPlus className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
-    </Link>
+    </div>
   )
 }
