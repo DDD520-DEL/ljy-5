@@ -713,6 +713,17 @@ export function registerMeetup(meetupId: number, data: Omit<Registration, 'id' |
   db.registrations.push(registration)
   meetup.currentParticipants++
   
+  createNotification(
+    data.nickname,
+    'meetup_register',
+    '读书会报名成功',
+    `您已成功报名《${meetup.title}》，活动时间：${new Date(meetup.date).toLocaleString('zh-CN')}，地点：${meetup.location}。`,
+    undefined,
+    meetup.title,
+    meetupId,
+    'meetup'
+  )
+  
   persistDB()
   return { registration }
 }
@@ -929,7 +940,9 @@ export function createNotification(
   title: string,
   content: string,
   relatedBookId?: number,
-  relatedBookTitle?: string
+  relatedBookTitle?: string,
+  relatedId?: number,
+  relatedType?: string
 ): Notification {
   const notification: Notification = {
     id: db.nextNotificationId++,
@@ -939,6 +952,8 @@ export function createNotification(
     content,
     relatedBookId,
     relatedBookTitle,
+    relatedId,
+    relatedType,
     read: false,
     createdAt: new Date().toISOString(),
   }
@@ -1018,6 +1033,20 @@ export function markNotificationRead(notificationId: number, nickname: string): 
   notification.read = true
   persistDB()
   return notification
+}
+
+export function markAllNotificationsRead(nickname: string): number {
+  let count = 0
+  db.notifications.forEach(n => {
+    if (n.nickname === nickname && !n.read) {
+      n.read = true
+      count++
+    }
+  })
+  if (count > 0) {
+    persistDB()
+  }
+  return count
 }
 
 export function getUnreadNotificationCount(nickname: string): number {
@@ -1101,6 +1130,17 @@ export function notifyNextInQueue(bookId: number): Reservation | null {
   const next = waiting[0]
   next.status = 'notified'
   next.notifiedAt = new Date().toISOString()
+
+  const book = db.books.find(b => b.id === bookId)
+  createNotification(
+    next.nickname,
+    'reservation_available',
+    '预约的图书可以借阅了',
+    `您预约的《${book?.title || `图书#${bookId}`}》现在可以借阅了，请尽快到店办理借阅手续。`,
+    bookId,
+    book?.title
+  )
+
   persistDB()
   return next
 }
@@ -1400,6 +1440,17 @@ export function approveDonationReview(
 
   addTraceLog(result.book.id, '捐赠', `${review.donor}捐赠《${result.book.title}》，审核通过正式入库`, review.reviewer)
 
+  createNotification(
+    review.donor,
+    'donation_approved',
+    '捐赠图书审核通过',
+    `您捐赠的《${review.title}》已审核通过，正式入库。感谢您的爱心捐赠！`,
+    result.book.id,
+    result.book.title,
+    review.id,
+    'donation'
+  )
+
   persistDB()
   console.log(`[DonationReview] 捐赠审核通过: ${review.title} -> 图书ID ${result.book.id}`)
 
@@ -1416,6 +1467,17 @@ export function rejectDonationReview(id: number, reviewNote: string, reviewer?: 
   review.reviewer = reviewer || '管理员'
   review.reviewedAt = now
   review.updatedAt = now
+
+  createNotification(
+    review.donor,
+    'donation_rejected',
+    '捐赠图书审核未通过',
+    `您捐赠的《${review.title}》审核未通过。原因：${reviewNote}。`,
+    undefined,
+    review.title,
+    review.id,
+    'donation'
+  )
 
   persistDB()
   console.log(`[DonationReview] 捐赠审核驳回: ${review.title} (原因: ${reviewNote})`)
@@ -1528,6 +1590,20 @@ export function toggleNoteLike(noteId: number, nickname: string): { note: Note; 
     }
     db.noteLikes.push(like)
     note.likeCount++
+    
+    if (note.nickname !== nickname) {
+      createNotification(
+        note.nickname,
+        'note_like',
+        '你的笔记被点赞了',
+        `读者「${nickname}」点赞了你的笔记《${note.title}》。`,
+        note.bookId,
+        note.bookTitle,
+        noteId,
+        'note'
+      )
+    }
+    
     persistDB()
     return { note, liked: true }
   }
@@ -1557,6 +1633,19 @@ export function addNoteComment(noteId: number, data: { nickname: string; content
   
   db.noteComments.push(comment)
   note.commentCount++
+  
+  if (note.nickname !== data.nickname) {
+    createNotification(
+      note.nickname,
+      'comment_reply',
+      '你的笔记有新评论',
+      `读者「${data.nickname}」评论了你的笔记《${note.title}》：「${data.content.slice(0, 30)}${data.content.length > 30 ? '...' : ''}」。`,
+      note.bookId,
+      note.bookTitle,
+      noteId,
+      'note'
+    )
+  }
   
   persistDB()
   console.log(`[NoteComment] 新评论: 笔记ID ${noteId} (评论者: ${data.nickname})`)

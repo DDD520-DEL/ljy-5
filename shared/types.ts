@@ -66,7 +66,16 @@ export interface BorrowRecord {
   updatedAt: string
 }
 
-export type NotificationType = 'reminder' | 'system' | 'reservation'
+export type NotificationType =
+  | 'reminder'
+  | 'system'
+  | 'reservation'
+  | 'reservation_available'
+  | 'meetup_register'
+  | 'comment_reply'
+  | 'note_like'
+  | 'donation_approved'
+  | 'donation_rejected'
 
 export interface Notification {
   id: number
@@ -76,6 +85,8 @@ export interface Notification {
   content: string
   relatedBookId?: number
   relatedBookTitle?: string
+  relatedId?: number
+  relatedType?: string
   read: boolean
   createdAt: string
   emailSent?: boolean

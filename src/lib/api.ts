@@ -120,6 +120,10 @@ export const bookApi = {
     request<{ success: boolean; notification: Notification }>(`/books/readers/${encodeURIComponent(nickname)}/notifications/${notificationId}/read`, {
       method: 'POST',
     }),
+  markAllNotificationsRead: (nickname: string) =>
+    request<{ success: boolean; count: number }>(`/books/readers/${encodeURIComponent(nickname)}/notifications/read-all`, {
+      method: 'POST',
+    }),
   getActiveBorrows: () =>
     request<BorrowRecordWithBook[]>('/books/borrow/active'),
   getOverdueBorrows: () =>

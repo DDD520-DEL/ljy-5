@@ -1,10 +1,12 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookPlus, Library, Users, PlusCircle, BookOpen, Home, BookmarkPlus, ClipboardCheck, ArrowLeftRight, Settings2 } from 'lucide-react'
+import { LayoutDashboard, BookPlus, Library, Users, PlusCircle, BookOpen, Home, BookmarkPlus, ClipboardCheck, ArrowLeftRight, Settings2, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import NotificationCenter from './NotificationCenter'
 
 export default function Layout() {
   const location = useLocation()
   const isTracePage = location.pathname.startsWith('/trace/')
+  const nickname = '书店管理员'
 
   if (isTracePage) {
     return (
@@ -77,13 +79,21 @@ export default function Layout() {
         </nav>
         <div className="p-4 border-t border-coffee-100">
           <div className="p-3 rounded-lg bg-coffee-50">
-            <p className="text-xs font-medium text-coffee-700">书店管理员</p>
+            <p className="text-xs font-medium text-coffee-700">{nickname}</p>
             <p className="text-xs text-coffee-500 mt-0.5">欢迎回来，今天也要加油！</p>
           </div>
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
+        <header className="bg-white border-b border-coffee-100 p-4 hidden md:flex items-center justify-end gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-coffee-50">
+            <User className="w-4 h-4 text-coffee-600" />
+            <span className="text-sm text-coffee-700">{nickname}</span>
+          </div>
+          <NotificationCenter nickname={nickname} />
+        </header>
+
         <header className="md:hidden bg-white border-b border-coffee-100 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -92,6 +102,7 @@ export default function Layout() {
               </div>
               <h1 className="font-serif font-bold text-coffee-900">墨香书坊</h1>
             </div>
+            <NotificationCenter nickname={nickname} />
           </div>
           <nav className="flex gap-1 mt-3 overflow-x-auto pb-1">
             {navItems.map((item) => {

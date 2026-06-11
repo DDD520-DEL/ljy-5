@@ -1,6 +1,6 @@
 import express from 'express'
 import QRCode from 'qrcode'
-import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower, getReviewsWithLevel, addPoints, getPointsRanking, getBorrowRanking, getReaderProfile, createBorrowRecord, getBookBorrowStatusDetail, sendReminder, getAllActiveBorrowRecords, getAllOverdueRecords, getNotifications, markNotificationRead } from '../db'
+import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower, getReviewsWithLevel, addPoints, getPointsRanking, getBorrowRanking, getReaderProfile, createBorrowRecord, getBookBorrowStatusDetail, sendReminder, getAllActiveBorrowRecords, getAllOverdueRecords, getNotifications, markNotificationRead, markAllNotificationsRead } from '../db'
 import type { CreateBookRequest, CreateReviewRequest, ReaderRanking } from '../../shared/types'
 
 const router = express.Router()
@@ -83,6 +83,12 @@ router.post('/readers/:nickname/notifications/:id/read', (req, res) => {
     return
   }
   res.json({ success: true, notification: result })
+})
+
+router.post('/readers/:nickname/notifications/read-all', (req, res) => {
+  const { nickname } = req.params
+  const count = markAllNotificationsRead(decodeURIComponent(nickname))
+  res.json({ success: true, count })
 })
 
 router.get('/borrow/active', (req, res) => {

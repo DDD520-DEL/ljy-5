@@ -1,7 +1,34 @@
 import { Link } from 'react-router-dom'
-import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, ChevronRight, BookMarked, Star } from 'lucide-react'
+import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, ChevronRight, BookMarked, Star, User } from 'lucide-react'
+import NotificationCenter from '@/components/NotificationCenter'
+import { useState, useEffect, useRef } from 'react'
+import { cn } from '@/lib/utils'
 
 export default function Home() {
+  const [nickname, setNickname] = useState<string>('爱读书的猫')
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
+
+  const readerNicknames = [
+    '爱读书的猫',
+    '夜读者',
+    '小王子的玫瑰',
+    '书虫阿明',
+    '追风筝的人',
+    '文字的力量',
+    '夜读者',
+  ]
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   const features = [
     {
       icon: QrCode,
@@ -31,6 +58,91 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-coffee-100">
+        <div className="container max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-coffee-600 to-coffee-800 flex items-center justify-center">
+              <BookOpen className="w-4.5 h-4.5 text-white" />
+            </div>
+            <div>
+              <h1 className="font-serif font-bold text-coffee-900">墨香书坊</h1>
+              <p className="text-[10px] text-coffee-500 -mt-0.5">溯源与读书会</p>
+            </div>
+          </Link>
+
+          <div className="flex items-center gap-2">
+            <Link
+              to="/books"
+              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-coffee-700 hover:bg-coffee-50 rounded-lg transition-colors"
+            >
+              浏览馆藏
+            </Link>
+            <Link
+              to="/meetups"
+              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-coffee-700 hover:bg-coffee-50 rounded-lg transition-colors"
+            >
+              读书会
+            </Link>
+            <Link
+              to="/dashboard"
+              className="hidden md:inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-coffee-700 hover:bg-coffee-50 rounded-lg transition-colors"
+            >
+              管理后台
+            </Link>
+
+            <div className="flex items-center gap-1 ml-2">
+              <NotificationCenter nickname={nickname} variant="home" />
+
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-coffee-50 hover:bg-coffee-100 transition-colors"
+                >
+                  <User className="w-4 h-4 text-coffee-600" />
+                  <span className="text-sm text-coffee-700 max-w-[100px] truncate">{nickname}</span>
+                </button>
+
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-coffee-100 py-2 animate-fade-in z-50">
+                    <div className="px-3 py-2 border-b border-coffee-50">
+                      <p className="text-xs text-coffee-500">切换身份（模拟读者）</p>
+                    </div>
+                    <div className="py-1 max-h-60 overflow-y-auto">
+                      {readerNicknames.map((name) => (
+                        <button
+                          key={name}
+                          onClick={() => {
+                            setNickname(name)
+                            setShowUserMenu(false)
+                          }}
+                          className={cn(
+                            'w-full text-left px-3 py-2 text-sm transition-colors',
+                            nickname === name
+                              ? 'bg-coffee-50 text-coffee-800 font-medium'
+                              : 'text-coffee-600 hover:bg-coffee-50'
+                          )}
+                        >
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="px-3 py-2 border-t border-coffee-50">
+                      <Link
+                        to={`/readers/${encodeURIComponent(nickname)}`}
+                        className="block text-sm text-coffee-600 hover:text-coffee-800"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        查看个人主页
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
       <section className="relative py-20 px-4 md:py-28 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-coffee-50 via-amber-50/50 to-coffee-100" />
         <div className="absolute top-0 right-0 w-96 h-96 bg-brass-400/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
