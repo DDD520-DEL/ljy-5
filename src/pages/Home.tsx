@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, ChevronRight, BookMarked, Star, User, Tag, Eye, Globe, MessageSquare, CalendarDays, Archive } from 'lucide-react'
+import { BookOpen, Users, QrCode, Heart, MapPin, Clock, Coffee, Sparkles, ChevronRight, BookMarked, Star, User, Tag, Eye, Globe, MessageSquare, CalendarDays, Archive, ChevronLeft, Flame } from 'lucide-react'
 import FeedbackModal from '@/components/FeedbackModal'
 import NotificationCenter from '@/components/NotificationCenter'
 import MonthlyStarsWall from '@/components/MonthlyStarsWall'
@@ -24,6 +24,9 @@ export default function Home() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
   const [readingStats, setReadingStats] = useState<ReadingCheckInStats | null>(null)
   const [readingHeatmap, setReadingHeatmap] = useState<ReadingCheckInHeatmapData[]>([])
+  const [newArrivals, setNewArrivals] = useState<BookType[]>([])
+  const [newArrivalsLoading, setNewArrivalsLoading] = useState(true)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function loadRecommendations() {
@@ -86,6 +89,31 @@ export default function Home() {
     }
     loadReadingData()
   }, [nickname])
+
+  useEffect(() => {
+    async function loadNewArrivals() {
+      try {
+        setNewArrivalsLoading(true)
+        const data = await bookApi.getNewArrivals(7)
+        setNewArrivals(data)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setNewArrivalsLoading(false)
+      }
+    }
+    loadNewArrivals()
+  }, [])
+
+  function scrollBooks(direction: 'left' | 'right') {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const scrollAmount = 320
+    container.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth'
+    })
+  }
 
   async function handleCheckInSuccess() {
     try {
@@ -291,6 +319,143 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {newArrivals.length > 0 && (
+        <section className="py-16 px-4 bg-white overflow-hidden">
+          <div className="container max-w-6xl mx-auto">
+            <div className="flex items-end justify-between mb-10">
+              <div>
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-rose-50 to-amber-50 border border-rose-200 mb-4 shadow-sm">
+                  <Flame className="w-4 h-4 text-rose-500" />
+                  <span className="text-sm text-rose-700 font-medium">NEW · 最近 7 天</span>
+                </div>
+                <h2 className="text-3xl md:text-4xl font-serif font-bold text-coffee-900 mb-3">
+                  新书上架
+                </h2>
+                <p className="text-coffee-600 max-w-xl">
+                  新鲜入库的精选好书，管理员诚意推荐
+                </p>
+              </div>
+              <div className="hidden sm:flex items-center gap-2">
+                <button
+                  onClick={() => scrollBooks('left')}
+                  className="w-10 h-10 rounded-full bg-white border border-coffee-200 shadow-sm flex items-center justify-center text-coffee-600 hover:bg-coffee-50 hover:border-coffee-300 transition-all"
+                  aria-label="向左滚动"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => scrollBooks('right')}
+                  className="w-10 h-10 rounded-full bg-coffee-700 text-white shadow-sm flex items-center justify-center hover:bg-coffee-800 transition-all"
+                  aria-label="向右滚动"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {newArrivalsLoading ? (
+              <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex-shrink-0 w-64 animate-pulse">
+                    <div className="aspect-[3/4] bg-coffee-100 rounded-2xl mb-3" />
+                    <div className="h-5 bg-coffee-100 rounded w-3/4 mb-2" />
+                    <div className="h-4 bg-coffee-100 rounded w-full" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="relative">
+                <div
+                  ref={scrollContainerRef}
+                  className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 scroll-smooth snap-x snap-mandatory"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                  <style>{`
+                    div::-webkit-scrollbar { display: none; }
+                  `}</style>
+                  {newArrivals.map((book) => (
+                    <Link
+                      key={book.id}
+                      to={`/books/${book.id}`}
+                      className="flex-shrink-0 w-64 snap-start group"
+                    >
+                      <div className="relative">
+                        <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-gradient-to-br from-coffee-100 to-amber-50 mb-4 shadow-md group-hover:shadow-2xl transition-all duration-500 group-hover:-translate-y-2 border border-coffee-100">
+                          {book.coverImage ? (
+                            <img
+                              src={book.coverImage}
+                              alt={book.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-coffee-300">
+                              <BookOpen className="w-16 h-16" />
+                            </div>
+                          )}
+                          <div className="absolute top-3 left-3">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-sm text-[11px] font-semibold text-rose-600 border border-rose-100 shadow-sm">
+                              <Sparkles className="w-3 h-3" />
+                              新书上架
+                            </span>
+                          </div>
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                          <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                            <div className="flex items-center justify-between text-white/90 text-xs">
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5" />
+                                {(() => {
+                                  const days = Math.floor((Date.now() - new Date(book.createdAt).getTime()) / 86400000)
+                                  return days === 0 ? '今天入库' : `${days} 天前入库`
+                                })()}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Tag className="w-3.5 h-3.5" />
+                                {book.category}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <h3 className="font-serif font-bold text-lg text-coffee-900 mb-1.5 group-hover:text-coffee-700 transition-colors truncate">
+                          {book.title}
+                        </h3>
+                        <p className="text-sm text-coffee-500 mb-3 truncate">
+                          {book.author}
+                        </p>
+                        {book.recommendQuote && (
+                          <div className="relative p-3 bg-gradient-to-br from-amber-50 to-coffee-50 rounded-xl border border-amber-100">
+                            <div className="absolute -top-2 left-3 text-2xl text-amber-300 font-serif leading-none">
+                              "
+                            </div>
+                            <p className="text-sm text-coffee-700 leading-relaxed pl-2 pr-1 line-clamp-2 italic">
+                              {book.recommendQuote}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+
+                <div className="flex justify-center gap-2 mt-6 sm:hidden">
+                  <button
+                    onClick={() => scrollBooks('left')}
+                    className="w-9 h-9 rounded-full bg-white border border-coffee-200 shadow-sm flex items-center justify-center text-coffee-600"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => scrollBooks('right')}
+                    className="w-9 h-9 rounded-full bg-coffee-700 text-white shadow-sm flex items-center justify-center"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       <section className="py-12 px-4 bg-gradient-to-b from-coffee-50/50 to-white">
         <div className="container max-w-4xl mx-auto">

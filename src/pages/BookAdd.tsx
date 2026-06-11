@@ -5,7 +5,7 @@ import { bookApi, donationApi } from '@/lib/api'
 import { sourceTypeLabel, cn } from '@/lib/utils'
 import type { SourceType, CreateBookRequest } from '../../shared/types'
 
-type FormState = Omit<CreateBookRequest, 'sourceType'> & { sourceType: SourceType; donor: string; donorContact: string; tagInput: string }
+type FormState = Omit<CreateBookRequest, 'sourceType'> & { sourceType: SourceType; donor: string; donorContact: string; tagInput: string; publishAnnouncement: boolean; recommendQuote: string }
 
 const initialForm: FormState = {
   title: '',
@@ -21,6 +21,8 @@ const initialForm: FormState = {
   donor: '',
   donorContact: '',
   tagInput: '',
+  publishAnnouncement: false,
+  recommendQuote: '',
 }
 
 export default function BookAdd() {
@@ -41,7 +43,7 @@ export default function BookAdd() {
 
   const sourceTypes: SourceType[] = ['donation', 'direct', 'secondhand']
 
-  function handleChange(field: keyof FormState, value: string) {
+  function handleChange(field: keyof FormState, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
@@ -63,6 +65,10 @@ export default function BookAdd() {
     }
     if (!form.category.trim()) {
       setError('请输入分类')
+      return
+    }
+    if (form.sourceType !== 'donation' && form.publishAnnouncement && !form.recommendQuote.trim()) {
+      setError('请输入一句话推荐语')
       return
     }
 
@@ -465,6 +471,50 @@ export default function BookAdd() {
             )}
           </div>
         </div>
+
+        <div className="w-full h-px bg-coffee-100" />
+
+        {form.sourceType !== 'donation' && (
+          <div className="space-y-4">
+            <h3 className="section-title">上架公告</h3>
+            <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-amber-50 to-coffee-50 rounded-xl border border-amber-200">
+              <input
+                type="checkbox"
+                id="publishAnnouncement"
+                className="mt-1 w-4 h-4 text-coffee-600 bg-white border-coffee-300 rounded focus:ring-coffee-500 focus:ring-2 cursor-pointer"
+                checked={form.publishAnnouncement}
+                onChange={(e) => handleChange('publishAnnouncement', e.target.checked)}
+              />
+              <div className="flex-1">
+                <label
+                  htmlFor="publishAnnouncement"
+                  className="text-sm font-medium text-coffee-800 cursor-pointer select-none"
+                >
+                  发布上架公告
+                </label>
+                <p className="text-xs text-coffee-500 mt-1">
+                  勾选后，本书将自动出现在首页「新书上架」公告栏，展示 7 天后自动移除
+                </p>
+              </div>
+            </div>
+            {form.publishAnnouncement && (
+              <div>
+                <label className="label">一句话推荐语 <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="请输入不超过 30 字的推荐语，如「年度最值得读的科幻神作」"
+                  maxLength={30}
+                  value={form.recommendQuote}
+                  onChange={(e) => handleChange('recommendQuote', e.target.value)}
+                />
+                <p className="text-xs text-coffee-400 mt-1 text-right">
+                  {form.recommendQuote.length}/30
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="w-full h-px bg-coffee-100" />
 

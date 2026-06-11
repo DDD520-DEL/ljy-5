@@ -1,7 +1,7 @@
 import express from 'express'
 import QRCode from 'qrcode'
 import XLSX from 'xlsx'
-import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower, getReviewsWithLevel, addPoints, getPointsRanking, getBorrowRanking, getReaderProfile, createBorrowRecord, getBookBorrowStatusDetail, sendReminder, getAllActiveBorrowRecords, getAllOverdueRecords, getNotifications, markNotificationRead, markAllNotificationsRead, getTagStats, getRecommendedBooks, getRatingStats, enrichBookWithRating } from '../db'
+import { getDB, addBook, addReview, addTraceLog, incrementBorrowCount, returnBook, isBookBorrowed, getBookReservations, fulfillReservationByBorrower, getReviewsWithLevel, addPoints, getPointsRanking, getBorrowRanking, getReaderProfile, createBorrowRecord, getBookBorrowStatusDetail, sendReminder, getAllActiveBorrowRecords, getAllOverdueRecords, getNotifications, markNotificationRead, markAllNotificationsRead, getTagStats, getRecommendedBooks, getRatingStats, enrichBookWithRating, getNewArrivals } from '../db'
 import type { CreateBookRequest, CreateReviewRequest, ReaderRanking, TagStat, RecommendResult, RatingStats, Book, TraceLog } from '../../shared/types'
 
 const router = express.Router()
@@ -61,6 +61,13 @@ router.get('/readers/ranking', (req, res) => {
     ranking = getPointsRanking(limitNum)
   }
   res.json(ranking)
+})
+
+router.get('/new-arrivals', (req, res) => {
+  const { days = '7' } = req.query
+  const daysNum = parseInt(days as string) || 7
+  const books = getNewArrivals(daysNum)
+  res.json(books.map(b => enrichBookWithRating(b)))
 })
 
 router.get('/tags/stats', (_req, res) => {

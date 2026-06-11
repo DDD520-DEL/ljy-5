@@ -42,6 +42,8 @@ export interface Book {
   discussCount: number
   averageRating?: number
   reviewCount?: number
+  publishAnnouncement?: boolean
+  recommendQuote?: string
 }
 
 export interface RatingStats {
@@ -183,6 +185,8 @@ export interface ApproveDonationRequest {
   description?: string
   bookPhotos?: string[]
   reviewer?: string
+  publishAnnouncement?: boolean
+  recommendQuote?: string
 }
 
 export interface RejectDonationRequest {
@@ -202,6 +206,8 @@ export interface CreateBookRequest {
   description?: string
   tags?: string[]
   donor?: string
+  publishAnnouncement?: boolean
+  recommendQuote?: string
 }
 
 export interface TagStat {

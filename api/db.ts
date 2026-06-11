@@ -19,6 +19,9 @@ function randomTraceId(): string {
   return 'BOOK-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 8).toUpperCase()
 }
 
+const today = new Date('2026-06-11T00:00:00.000Z')
+const daysAgo = (d: number) => new Date(today.getTime() - d * 86400000).toISOString()
+
 const initialBooks: Book[] = [
   {
     id: 1,
@@ -84,9 +87,11 @@ const initialBooks: Book[] = [
     coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=sapiens%20brief%20history%20humankind%20book%20cover%20evolution%20human%20history&image_size=portrait_4_3',
     description: '从认知革命到科学革命，重新审视人类历史',
     tags: ['入门友好', '历史社科', '冷门佳作', '深度阅读'],
-    createdAt: '2026-01-05T16:00:00.000Z',
+    createdAt: daysAgo(5),
     borrowCount: 18,
-    discussCount: 3
+    discussCount: 3,
+    publishAnnouncement: true,
+    recommendQuote: '用全新视角审视人类的过去与未来'
   },
   {
     id: 5,
@@ -104,6 +109,44 @@ const initialBooks: Book[] = [
     createdAt: '2025-09-10T11:45:00.000Z',
     borrowCount: 52,
     discussCount: 12
+  },
+  {
+    id: 6,
+    traceId: 'BOOK-PQR678-006',
+    title: '置身事内',
+    author: '兰小欢',
+    isbn: '9787208174306',
+    publisher: '上海人民出版社',
+    category: '历史社科',
+    sourceType: 'direct',
+    sourceInfo: '出版社直供，2026年新版',
+    coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20economics%20book%20cover%20government%20economy%20minimalist%20blue%20design&image_size=portrait_4_3',
+    description: '从经济学角度理解中国政府与经济的关系',
+    tags: ['入门友好', '历史社科', '深度阅读'],
+    createdAt: daysAgo(2),
+    borrowCount: 0,
+    discussCount: 0,
+    publishAnnouncement: true,
+    recommendQuote: '读懂中国经济的必读书目'
+  },
+  {
+    id: 7,
+    traceId: 'BOOK-STU901-007',
+    title: '克拉拉与太阳',
+    author: '石黑一雄',
+    isbn: '9787532786831',
+    publisher: '上海译文出版社',
+    category: '文学小说',
+    sourceType: 'secondhand',
+    sourceInfo: '二手回收，品相良好',
+    coverImage: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=klara%20and%20the%20sun%20book%20cover%20artificial%20intelligence%20robot%20warm%20sunset&image_size=portrait_4_3',
+    description: '诺贝尔文学奖得主石黑一雄关于人工智能与爱的思考',
+    tags: ['治愈系', '科幻', '深度阅读'],
+    createdAt: daysAgo(6),
+    borrowCount: 1,
+    discussCount: 0,
+    publishAnnouncement: true,
+    recommendQuote: '机器人视角下的爱与人性'
   }
 ]
 
@@ -423,8 +466,6 @@ const initialCheckIns: CheckIn[] = [
   { id: 1, meetupId: 2, registrationId: 3, nickname: '小王子的玫瑰', createdAt: '2026-05-15T13:55:00.000Z' }
 ]
 
-const today = new Date('2026-06-11T00:00:00.000Z')
-const daysAgo = (d: number) => new Date(today.getTime() - d * 86400000).toISOString()
 const daysLater = (d: number) => new Date(today.getTime() + d * 86400000).toISOString()
 
 const initialBorrowRecords: BorrowRecord[] = [
@@ -672,7 +713,7 @@ const initialDB: Database = {
   feedbacks: [],
   monthlyStars: initialMonthlyStars,
   readingCheckIns: initialReadingCheckIns,
-  nextBookId: 6,
+  nextBookId: 8,
   nextTraceLogId: 9,
   nextReviewId: 9,
   nextMeetupId: 4,
@@ -875,7 +916,9 @@ export function addBook(bookData: Omit<Book, 'id' | 'traceId' | 'createdAt' | 'b
     traceId: randomTraceId(),
     createdAt: new Date().toISOString(),
     borrowCount: 0,
-    discussCount: 0
+    discussCount: 0,
+    publishAnnouncement: bookData.publishAnnouncement || false,
+    recommendQuote: bookData.recommendQuote || undefined,
   }
   db.books.push(newBook)
   
@@ -902,6 +945,17 @@ function getSourceDescription(sourceType: SourceType, sourceInfo?: string): stri
     secondhand: '二手回收'
   }
   return sourceInfo ? `${sourceMap[sourceType]}：${sourceInfo}` : sourceMap[sourceType]
+}
+
+export function getNewArrivals(days: number = 7): Book[] {
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - days)
+  return db.books
+    .filter(b => 
+      b.publishAnnouncement === true && 
+      new Date(b.createdAt) >= cutoff
+    )
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 }
 
 export function addTraceLog(bookId: number, action: TraceLog['action'], description: string, operator?: string): TraceLog {
@@ -1674,7 +1728,7 @@ export function getDonationReviewsByDonor(donor: string): DonationReview[] {
 
 export function approveDonationReview(
   id: number,
-  corrections: Partial<Pick<DonationReview, 'title' | 'author' | 'isbn' | 'publisher' | 'category' | 'sourceInfo' | 'coverImage' | 'description'>> & { bookPhotos?: string[]; reviewer?: string }
+  corrections: Partial<Pick<DonationReview, 'title' | 'author' | 'isbn' | 'publisher' | 'category' | 'sourceInfo' | 'coverImage' | 'description'>> & { bookPhotos?: string[]; reviewer?: string; publishAnnouncement?: boolean; recommendQuote?: string }
 ): { review: DonationReview; book: Book; pointsResult?: ReturnType<typeof addPoints> } | null {
   const review = db.donationReviews.find(r => r.id === id)
   if (!review || review.status !== 'pending') return null
@@ -1700,6 +1754,8 @@ export function approveDonationReview(
     coverImage: corrections.coverImage || review.coverImage,
     description: corrections.description || review.description,
     donor: review.donor,
+    publishAnnouncement: corrections.publishAnnouncement || false,
+    recommendQuote: corrections.recommendQuote || undefined,
   }
 
   const result = addBook(bookData)

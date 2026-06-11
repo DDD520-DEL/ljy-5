@@ -66,6 +66,8 @@ export default function DonationReviewPage() {
       description: review.description,
       bookPhotos: [],
       reviewer: '管理员',
+      publishAnnouncement: false,
+      recommendQuote: '',
     })
     setSelectedReview(review)
     setShowApproveModal(true)
@@ -81,6 +83,10 @@ export default function DonationReviewPage() {
 
   async function handleApprove() {
     if (!selectedReview) return
+    if (approveForm.publishAnnouncement && !approveForm.recommendQuote?.trim()) {
+      setError('请输入一句话推荐语')
+      return
+    }
     setSubmitting(true)
     setError(null)
     try {
@@ -409,6 +415,47 @@ export default function DonationReviewPage() {
                   value={approveForm.description || ''}
                   onChange={(e) => setApproveForm(prev => ({ ...prev, description: e.target.value }))}
                 />
+              </div>
+
+              <div className="space-y-4 p-4 bg-gradient-to-br from-amber-50 to-coffee-50 rounded-xl border border-amber-200">
+                <div>
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="donationPublishAnnouncement"
+                      className="mt-1 w-4 h-4 text-coffee-600 bg-white border-coffee-300 rounded focus:ring-coffee-500 focus:ring-2 cursor-pointer"
+                      checked={approveForm.publishAnnouncement || false}
+                      onChange={(e) => setApproveForm(prev => ({ ...prev, publishAnnouncement: e.target.checked }))}
+                    />
+                    <div className="flex-1">
+                      <label
+                        htmlFor="donationPublishAnnouncement"
+                        className="text-sm font-medium text-coffee-800 cursor-pointer select-none"
+                      >
+                        发布上架公告
+                      </label>
+                      <p className="text-xs text-coffee-500 mt-1">
+                        勾选后，本书将自动出现在首页「新书上架」公告栏，展示 7 天后自动移除
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                {approveForm.publishAnnouncement && (
+                  <div>
+                    <label className="label">一句话推荐语 <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="请输入不超过 30 字的推荐语"
+                      maxLength={30}
+                      value={approveForm.recommendQuote || ''}
+                      onChange={(e) => setApproveForm(prev => ({ ...prev, recommendQuote: e.target.value }))}
+                    />
+                    <p className="text-xs text-coffee-400 mt-1 text-right">
+                      {(approveForm.recommendQuote || '').length}/30
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div>

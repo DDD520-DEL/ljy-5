@@ -183,6 +183,8 @@ export const bookApi = {
     request<TagStat[]>('/books/tags/stats'),
   recommend: (nickname: string, limit: number = 6) =>
     request<RecommendResult>(`/books/recommend?nickname=${encodeURIComponent(nickname)}&limit=${limit}`),
+  getNewArrivals: (days: number = 7) =>
+    request<Book[]>(`/books/new-arrivals?days=${days}`),
   exportBooks: (params?: { category?: string; source?: string }) => {
     const qs = new URLSearchParams()
     if (params?.category) qs.set('category', params.category)
